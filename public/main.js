@@ -5184,9 +5184,9 @@ var $elm$browser$Browser$document = _Browser_document;
 var $author$project$Main$Axiom = function (a) {
 	return {$: 'Axiom', a: a};
 };
-var $author$project$Main$Domain = F3(
-	function (a, b, c) {
-		return {$: 'Domain', a: a, b: b, c: c};
+var $author$project$Main$Domain = F2(
+	function (a, b) {
+		return {$: 'Domain', a: a, b: b};
 	});
 var $author$project$Main$Grammar = F2(
 	function (a, b) {
@@ -5211,26 +5211,24 @@ var $author$project$Main$init = function (_v0) {
 		{
 			domains: A2(
 				$author$project$Data$OneOrMore$OneOrMore,
-				A3(
+				A2(
 					$author$project$Main$Domain,
-					1,
 					'Variable',
 					_List_fromArray(
 						['x', 'y', 'z'])),
 				_List_fromArray(
 					[
-						A3(
+						A2(
 						$author$project$Main$Domain,
-						2,
 						'Integer',
 						_List_fromArray(
 							['n', 'm'])),
-						A3(
+						A2(
 						$author$project$Main$Domain,
-						3,
 						'Expression',
 						_List_fromArray(
-							['e', 'e₀', 'e₁']))
+							['e', 'e₀', 'e₁'])),
+						A2($author$project$Main$Domain, '', _List_Nil)
 					])),
 			editing: $elm$core$Maybe$Just(1),
 			expression: '(\\x.x)',
@@ -5240,7 +5238,7 @@ var $author$project$Main$init = function (_v0) {
 					$author$project$Main$Grammar,
 					'e',
 					_List_fromArray(
-						['x', 'n', 'e1 + e2', 'e1 × e2', 'x := e1;e2'])),
+						['x', 'n', 'e1 + e2', 'e1 × e2', 'x := e1;e2', ''])),
 				_List_Nil),
 			result: $elm$core$Result$Err(_List_Nil),
 			semantics: A2(
@@ -5263,53 +5261,258 @@ var $author$project$Main$init = function (_v0) {
 };
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
-var $author$project$Data$OneOrMore$map = F2(
+var $elm$core$Basics$always = F2(
+	function (a, _v0) {
+		return a;
+	});
+var $author$project$Data$OneOrMore$indexedMap = F2(
 	function (func, _v0) {
 		var first = _v0.a;
 		var rest = _v0.b;
 		return A2(
 			$author$project$Data$OneOrMore$OneOrMore,
-			func(first),
-			A2($elm$core$List$map, func, rest));
+			A2(func, 0, first),
+			A2(
+				$elm$core$List$indexedMap,
+				F2(
+					function (i, a) {
+						return A2(func, i + 1, a);
+					}),
+				rest));
+	});
+var $author$project$Data$OneOrMore$updateAt = F2(
+	function (searched, func) {
+		return $author$project$Data$OneOrMore$indexedMap(
+			F2(
+				function (index, value) {
+					return _Utils_eq(index, searched) ? func(value) : value;
+				}));
+	});
+var $elm$core$List$drop = F2(
+	function (n, list) {
+		drop:
+		while (true) {
+			if (n <= 0) {
+				return list;
+			} else {
+				if (!list.b) {
+					return list;
+				} else {
+					var x = list.a;
+					var xs = list.b;
+					var $temp$n = n - 1,
+						$temp$list = xs;
+					n = $temp$n;
+					list = $temp$list;
+					continue drop;
+				}
+			}
+		}
+	});
+var $elm$core$List$takeReverse = F3(
+	function (n, list, kept) {
+		takeReverse:
+		while (true) {
+			if (n <= 0) {
+				return kept;
+			} else {
+				if (!list.b) {
+					return kept;
+				} else {
+					var x = list.a;
+					var xs = list.b;
+					var $temp$n = n - 1,
+						$temp$list = xs,
+						$temp$kept = A2($elm$core$List$cons, x, kept);
+					n = $temp$n;
+					list = $temp$list;
+					kept = $temp$kept;
+					continue takeReverse;
+				}
+			}
+		}
+	});
+var $elm$core$List$takeTailRec = F2(
+	function (n, list) {
+		return $elm$core$List$reverse(
+			A3($elm$core$List$takeReverse, n, list, _List_Nil));
+	});
+var $elm$core$List$takeFast = F3(
+	function (ctr, n, list) {
+		if (n <= 0) {
+			return _List_Nil;
+		} else {
+			var _v0 = _Utils_Tuple2(n, list);
+			_v0$1:
+			while (true) {
+				_v0$5:
+				while (true) {
+					if (!_v0.b.b) {
+						return list;
+					} else {
+						if (_v0.b.b.b) {
+							switch (_v0.a) {
+								case 1:
+									break _v0$1;
+								case 2:
+									var _v2 = _v0.b;
+									var x = _v2.a;
+									var _v3 = _v2.b;
+									var y = _v3.a;
+									return _List_fromArray(
+										[x, y]);
+								case 3:
+									if (_v0.b.b.b.b) {
+										var _v4 = _v0.b;
+										var x = _v4.a;
+										var _v5 = _v4.b;
+										var y = _v5.a;
+										var _v6 = _v5.b;
+										var z = _v6.a;
+										return _List_fromArray(
+											[x, y, z]);
+									} else {
+										break _v0$5;
+									}
+								default:
+									if (_v0.b.b.b.b && _v0.b.b.b.b.b) {
+										var _v7 = _v0.b;
+										var x = _v7.a;
+										var _v8 = _v7.b;
+										var y = _v8.a;
+										var _v9 = _v8.b;
+										var z = _v9.a;
+										var _v10 = _v9.b;
+										var w = _v10.a;
+										var tl = _v10.b;
+										return (ctr > 1000) ? A2(
+											$elm$core$List$cons,
+											x,
+											A2(
+												$elm$core$List$cons,
+												y,
+												A2(
+													$elm$core$List$cons,
+													z,
+													A2(
+														$elm$core$List$cons,
+														w,
+														A2($elm$core$List$takeTailRec, n - 4, tl))))) : A2(
+											$elm$core$List$cons,
+											x,
+											A2(
+												$elm$core$List$cons,
+												y,
+												A2(
+													$elm$core$List$cons,
+													z,
+													A2(
+														$elm$core$List$cons,
+														w,
+														A3($elm$core$List$takeFast, ctr + 1, n - 4, tl)))));
+									} else {
+										break _v0$5;
+									}
+							}
+						} else {
+							if (_v0.a === 1) {
+								break _v0$1;
+							} else {
+								break _v0$5;
+							}
+						}
+					}
+				}
+				return list;
+			}
+			var _v1 = _v0.b;
+			var x = _v1.a;
+			return _List_fromArray(
+				[x]);
+		}
+	});
+var $elm$core$List$take = F2(
+	function (n, list) {
+		return A3($elm$core$List$takeFast, 0, n, list);
+	});
+var $elm_community$list_extra$List$Extra$updateAt = F3(
+	function (index, fn, list) {
+		if (index < 0) {
+			return list;
+		} else {
+			var tail = A2($elm$core$List$drop, index, list);
+			var head = A2($elm$core$List$take, index, list);
+			if (tail.b) {
+				var x = tail.a;
+				var xs = tail.b;
+				return _Utils_ap(
+					head,
+					A2(
+						$elm$core$List$cons,
+						fn(x),
+						xs));
+			} else {
+				return list;
+			}
+		}
 	});
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		if (msg.$ === 'OnDomainEditVars') {
-			var searched = msg.a;
-			var vars = msg.b;
-			var updateOne = function (_v1) {
-				var id = _v1.a;
-				var name = _v1.b;
-				var existing = _v1.c;
-				return _Utils_eq(searched, id) ? A3(
-					$author$project$Main$Domain,
-					id,
-					name,
-					A2($elm$core$String$split, ' , ', vars)) : A3($author$project$Main$Domain, id, name, existing);
-			};
-			return _Utils_Tuple2(
-				_Utils_update(
-					model,
-					{
-						domains: A2($author$project$Data$OneOrMore$map, updateOne, model.domains)
-					}),
-				$elm$core$Platform$Cmd$none);
-		} else {
-			var searched = msg.a;
-			var name = msg.b;
-			var updateOne = function (_v2) {
-				var id = _v2.a;
-				var existing = _v2.b;
-				var vars = _v2.c;
-				return _Utils_eq(searched, id) ? A3($author$project$Main$Domain, id, name, vars) : A3($author$project$Main$Domain, id, existing, vars);
-			};
-			return _Utils_Tuple2(
-				_Utils_update(
-					model,
-					{
-						domains: A2($author$project$Data$OneOrMore$map, updateOne, model.domains)
-					}),
-				$elm$core$Platform$Cmd$none);
+		switch (msg.$) {
+			case 'OnDomainEditVars':
+				var index = msg.a;
+				var vars = msg.b;
+				var update_ = function (_v1) {
+					var name = _v1.a;
+					return A2(
+						$author$project$Main$Domain,
+						name,
+						A2($elm$core$String$split, ' , ', vars));
+				};
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							domains: A3($author$project$Data$OneOrMore$updateAt, index, update_, model.domains)
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'OnDomainEditName':
+				var index = msg.a;
+				var name = msg.b;
+				var update_ = function (_v2) {
+					var vars = _v2.b;
+					return A2($author$project$Main$Domain, name, vars);
+				};
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							domains: A3($author$project$Data$OneOrMore$updateAt, index, update_, model.domains)
+						}),
+					$elm$core$Platform$Cmd$none);
+			default:
+				var index = msg.a;
+				var syntaxIndex = msg.b;
+				var newSyntax = msg.c;
+				var update_ = function (_v3) {
+					var name = _v3.a;
+					var syntaxes = _v3.b;
+					return A2(
+						$author$project$Main$Grammar,
+						name,
+						A3(
+							$elm_community$list_extra$List$Extra$updateAt,
+							syntaxIndex,
+							$elm$core$Basics$always(newSyntax),
+							syntaxes));
+				};
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							grammar: A3($author$project$Data$OneOrMore$updateAt, index, update_, model.grammar)
+						}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $mdgriffith$elm_ui$Internal$Model$AlignX = function (a) {
@@ -11531,36 +11734,8 @@ var $mdgriffith$elm_ui$Element$rgb255 = F3(
 		return A4($mdgriffith$elm_ui$Internal$Model$Rgba, red / 255, green / 255, blue / 255, 1);
 	});
 var $author$project$Main$gray = A3($mdgriffith$elm_ui$Element$rgb255, 175, 175, 175);
-var $mdgriffith$elm_ui$Element$Font$italic = $mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.italic);
-var $mdgriffith$elm_ui$Element$Input$HiddenLabel = function (a) {
-	return {$: 'HiddenLabel', a: a};
-};
-var $mdgriffith$elm_ui$Element$Input$labelHidden = $mdgriffith$elm_ui$Element$Input$HiddenLabel;
-var $author$project$Main$mathFont = $mdgriffith$elm_ui$Element$Font$family(
-	_List_fromArray(
-		[
-			$mdgriffith$elm_ui$Element$Font$typeface('LMRoman-Math'),
-			$mdgriffith$elm_ui$Element$Font$sansSerif
-		]));
-var $mdgriffith$elm_ui$Element$Input$Placeholder = F2(
-	function (a, b) {
-		return {$: 'Placeholder', a: a, b: b};
-	});
-var $mdgriffith$elm_ui$Element$Input$placeholder = $mdgriffith$elm_ui$Element$Input$Placeholder;
-var $author$project$Main$placeholder = function (string) {
-	return A2(
-		$mdgriffith$elm_ui$Element$Input$placeholder,
-		_List_Nil,
-		A2(
-			$mdgriffith$elm_ui$Element$el,
-			_List_fromArray(
-				[
-					$mdgriffith$elm_ui$Element$Font$color($author$project$Main$gray)
-				]),
-			$mdgriffith$elm_ui$Element$text(string)));
-};
-var $mdgriffith$elm_ui$Element$InternalColumn = function (a) {
-	return {$: 'InternalColumn', a: a};
+var $mdgriffith$elm_ui$Element$InternalIndexedColumn = function (a) {
+	return {$: 'InternalIndexedColumn', a: a};
 };
 var $mdgriffith$elm_ui$Internal$Model$Empty = {$: 'Empty'};
 var $mdgriffith$elm_ui$Internal$Model$GridPosition = function (a) {
@@ -11779,15 +11954,44 @@ var $mdgriffith$elm_ui$Element$tableHelper = F2(
 					}
 				}()));
 	});
-var $mdgriffith$elm_ui$Element$table = F2(
+var $mdgriffith$elm_ui$Element$indexedTable = F2(
 	function (attrs, config) {
 		return A2(
 			$mdgriffith$elm_ui$Element$tableHelper,
 			attrs,
 			{
-				columns: A2($elm$core$List$map, $mdgriffith$elm_ui$Element$InternalColumn, config.columns),
+				columns: A2($elm$core$List$map, $mdgriffith$elm_ui$Element$InternalIndexedColumn, config.columns),
 				data: config.data
 			});
+	});
+var $mdgriffith$elm_ui$Element$Font$italic = $mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.italic);
+var $mdgriffith$elm_ui$Element$Input$HiddenLabel = function (a) {
+	return {$: 'HiddenLabel', a: a};
+};
+var $mdgriffith$elm_ui$Element$Input$labelHidden = $mdgriffith$elm_ui$Element$Input$HiddenLabel;
+var $author$project$Main$mathFont = $mdgriffith$elm_ui$Element$Font$family(
+	_List_fromArray(
+		[
+			$mdgriffith$elm_ui$Element$Font$typeface('LMRoman-Math'),
+			$mdgriffith$elm_ui$Element$Font$sansSerif
+		]));
+var $mdgriffith$elm_ui$Element$Input$Placeholder = F2(
+	function (a, b) {
+		return {$: 'Placeholder', a: a, b: b};
+	});
+var $mdgriffith$elm_ui$Element$Input$placeholder = $mdgriffith$elm_ui$Element$Input$Placeholder;
+var $author$project$Main$placeholder = F2(
+	function (attrs, string) {
+		return A2(
+			$mdgriffith$elm_ui$Element$Input$placeholder,
+			_List_Nil,
+			A2(
+				$mdgriffith$elm_ui$Element$el,
+				A2(
+					$elm$core$List$cons,
+					$mdgriffith$elm_ui$Element$Font$color($author$project$Main$gray),
+					attrs),
+				$mdgriffith$elm_ui$Element$text(string)));
 	});
 var $mdgriffith$elm_ui$Element$Input$TextInputNode = function (a) {
 	return {$: 'TextInputNode', a: a};
@@ -12459,10 +12663,6 @@ var $elm$html$Html$Attributes$boolProperty = F2(
 var $elm$html$Html$Attributes$spellcheck = $elm$html$Html$Attributes$boolProperty('spellcheck');
 var $mdgriffith$elm_ui$Element$Input$spellcheck = A2($elm$core$Basics$composeL, $mdgriffith$elm_ui$Internal$Model$Attr, $elm$html$Html$Attributes$spellcheck);
 var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
-var $elm$core$Basics$always = F2(
-	function (a, _v0) {
-		return a;
-	});
 var $mdgriffith$elm_ui$Internal$Model$unstyled = A2($elm$core$Basics$composeL, $mdgriffith$elm_ui$Internal$Model$Unstyled, $elm$core$Basics$always);
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
 var $mdgriffith$elm_ui$Element$Input$value = A2($elm$core$Basics$composeL, $mdgriffith$elm_ui$Internal$Model$Attr, $elm$html$Html$Attributes$value);
@@ -12721,97 +12921,104 @@ var $author$project$Main$viewDomains = F2(
 	function (_v0, editing) {
 		var first = _v0.a;
 		var rest = _v0.b;
-		var viewRightSide = function (_v5) {
-			var id = _v5.a;
-			var name = _v5.b;
-			var vars = _v5.c;
-			if ((editing.$ === 'Just') && (editing.a === 1)) {
-				return A2(
-					$mdgriffith$elm_ui$Element$Input$text,
-					_List_fromArray(
-						[
-							$author$project$Main$borderBottom,
-							$mdgriffith$elm_ui$Element$Border$dashed,
-							$mdgriffith$elm_ui$Element$Border$color($author$project$Main$gray),
-							A2($mdgriffith$elm_ui$Element$paddingXY, 3, 3)
-						]),
-					{
-						label: $mdgriffith$elm_ui$Element$Input$labelHidden(
-							'Name of domain number ' + $elm$core$String$fromInt(id)),
-						onChange: $author$project$Main$OnDomainEditName(id),
-						placeholder: $elm$core$Maybe$Just(
-							$author$project$Main$placeholder('Another')),
-						text: name
-					});
-			} else {
-				return A2(
+		var viewRightSide = F2(
+			function (index, _v6) {
+				var name = _v6.a;
+				var vars = _v6.b;
+				if ((editing.$ === 'Just') && (editing.a === 1)) {
+					return A2(
+						$mdgriffith$elm_ui$Element$Input$text,
+						_List_fromArray(
+							[
+								$author$project$Main$borderBottom,
+								$mdgriffith$elm_ui$Element$Border$dashed,
+								$mdgriffith$elm_ui$Element$Border$color($author$project$Main$gray),
+								A2($mdgriffith$elm_ui$Element$paddingXY, 3, 3)
+							]),
+						{
+							label: $mdgriffith$elm_ui$Element$Input$labelHidden(
+								'Name of domain number ' + $elm$core$String$fromInt(index)),
+							onChange: $author$project$Main$OnDomainEditName(index),
+							placeholder: $elm$core$Maybe$Just(
+								A2($author$project$Main$placeholder, _List_Nil, 'Another')),
+							text: name
+						});
+				} else {
+					return A2(
+						$mdgriffith$elm_ui$Element$el,
+						_List_fromArray(
+							[$author$project$Main$boldFont, $mdgriffith$elm_ui$Element$Font$bold]),
+						$mdgriffith$elm_ui$Element$text(name));
+				}
+			});
+		var viewMiddle = F2(
+			function (_v3, _v4) {
+				var name = _v4.a;
+				var vars = _v4.b;
+				return ($elm$core$String$isEmpty(name) && $elm$core$List$isEmpty(vars)) ? A2(
 					$mdgriffith$elm_ui$Element$el,
-					_List_fromArray(
-						[$author$project$Main$boldFont, $mdgriffith$elm_ui$Element$Font$bold]),
-					$mdgriffith$elm_ui$Element$text(name));
-			}
-		};
-		var viewMiddle = function (_v3) {
-			var id = _v3.a;
-			var name = _v3.b;
-			var vars = _v3.c;
-			return ($elm$core$String$isEmpty(name) && $elm$core$List$isEmpty(vars)) ? A2(
-				$mdgriffith$elm_ui$Element$el,
-				_List_fromArray(
-					[
-						$author$project$Main$mathFont,
-						$mdgriffith$elm_ui$Element$Font$color($author$project$Main$gray)
-					]),
-				$mdgriffith$elm_ui$Element$text(' ∈ ')) : A2(
-				$mdgriffith$elm_ui$Element$el,
-				_List_fromArray(
-					[$author$project$Main$mathFont]),
-				$mdgriffith$elm_ui$Element$text(' ∈ '));
-		};
-		var viewLeftSide = function (_v2) {
-			var id = _v2.a;
-			var name = _v2.b;
-			var vars = _v2.c;
-			if ((editing.$ === 'Just') && (editing.a === 1)) {
-				return A2(
-					$mdgriffith$elm_ui$Element$Input$text,
 					_List_fromArray(
 						[
 							$author$project$Main$mathFont,
-							$mdgriffith$elm_ui$Element$Font$italic,
-							$author$project$Main$borderBottom,
-							$mdgriffith$elm_ui$Element$Border$dashed,
-							$mdgriffith$elm_ui$Element$Border$color($author$project$Main$gray),
-							A2($mdgriffith$elm_ui$Element$paddingXY, 3, 3),
-							$mdgriffith$elm_ui$Element$Font$alignRight
+							$mdgriffith$elm_ui$Element$Font$color($author$project$Main$gray)
 						]),
-					{
-						label: $mdgriffith$elm_ui$Element$Input$labelHidden(
-							'Variables of domain number ' + $elm$core$String$fromInt(id)),
-						onChange: $author$project$Main$OnDomainEditVars(id),
-						placeholder: $elm$core$Maybe$Just(
-							$author$project$Main$placeholder('a, b, c')),
-						text: A2($elm$core$String$join, ', ', vars)
-					});
-			} else {
-				return A2(
+					$mdgriffith$elm_ui$Element$text(' ∈ ')) : A2(
 					$mdgriffith$elm_ui$Element$el,
 					_List_fromArray(
-						[$author$project$Main$mathFont, $mdgriffith$elm_ui$Element$Font$italic, $mdgriffith$elm_ui$Element$Font$alignRight]),
-					$mdgriffith$elm_ui$Element$text(
-						A2($elm$core$String$join, ', ', vars)));
-			}
-		};
+						[$author$project$Main$mathFont]),
+					$mdgriffith$elm_ui$Element$text(' ∈ '));
+			});
+		var viewLeftSide = F2(
+			function (index, _v2) {
+				var name = _v2.a;
+				var vars = _v2.b;
+				if ((editing.$ === 'Just') && (editing.a === 1)) {
+					return A2(
+						$mdgriffith$elm_ui$Element$Input$text,
+						_List_fromArray(
+							[
+								$author$project$Main$mathFont,
+								$mdgriffith$elm_ui$Element$Font$italic,
+								$author$project$Main$borderBottom,
+								$mdgriffith$elm_ui$Element$Border$dashed,
+								$mdgriffith$elm_ui$Element$Border$color($author$project$Main$gray),
+								A2($mdgriffith$elm_ui$Element$paddingXY, 3, 3),
+								$mdgriffith$elm_ui$Element$Font$alignRight
+							]),
+						{
+							label: $mdgriffith$elm_ui$Element$Input$labelHidden(
+								'Variables of domain number ' + $elm$core$String$fromInt(index)),
+							onChange: $author$project$Main$OnDomainEditVars(index),
+							placeholder: $elm$core$Maybe$Just(
+								A2(
+									$author$project$Main$placeholder,
+									_List_fromArray(
+										[$mdgriffith$elm_ui$Element$alignRight]),
+									'a, b, c')),
+							text: A2($elm$core$String$join, ', ', vars)
+						});
+				} else {
+					return A2(
+						$mdgriffith$elm_ui$Element$el,
+						_List_fromArray(
+							[$author$project$Main$mathFont, $mdgriffith$elm_ui$Element$Font$italic, $mdgriffith$elm_ui$Element$Font$alignRight]),
+						$mdgriffith$elm_ui$Element$text(
+							A2($elm$core$String$join, ', ', vars)));
+				}
+			});
 		return A2(
 			$mdgriffith$elm_ui$Element$el,
 			_List_fromArray(
-				[$mdgriffith$elm_ui$Element$centerX]),
+				[
+					$mdgriffith$elm_ui$Element$centerX,
+					A2($mdgriffith$elm_ui$Element$paddingXY, 0, 20)
+				]),
 			A2(
-				$mdgriffith$elm_ui$Element$table,
+				$mdgriffith$elm_ui$Element$indexedTable,
 				_List_fromArray(
 					[
 						$mdgriffith$elm_ui$Element$centerX,
-						$mdgriffith$elm_ui$Element$spacing(7)
+						$mdgriffith$elm_ui$Element$spacing(5)
 					]),
 				{
 					columns: _List_fromArray(
@@ -12835,36 +13042,57 @@ var $author$project$Main$viewDomains = F2(
 					data: A2($elm$core$List$cons, first, rest)
 				}));
 	});
-var $elm$core$List$intersperse = F2(
-	function (sep, xs) {
-		if (!xs.b) {
-			return _List_Nil;
-		} else {
-			var hd = xs.a;
-			var tl = xs.b;
-			var step = F2(
-				function (x, rest) {
-					return A2(
-						$elm$core$List$cons,
-						sep,
-						A2($elm$core$List$cons, x, rest));
-				});
-			var spersed = A3($elm$core$List$foldr, step, _List_Nil, tl);
-			return A2($elm$core$List$cons, hd, spersed);
-		}
+var $author$project$Main$OnGrammarEditSyntax = F3(
+	function (a, b, c) {
+		return {$: 'OnGrammarEditSyntax', a: a, b: b, c: c};
 	});
-var $mdgriffith$elm_ui$Element$none = $mdgriffith$elm_ui$Internal$Model$Empty;
 var $author$project$Main$viewGrammar = F2(
 	function (_v0, editing) {
 		var first = _v0.a;
 		var rest = _v0.b;
-		var viewSyntax = function (syntax) {
+		var withDeliniator = function (show) {
 			return A2(
-				$mdgriffith$elm_ui$Element$el,
+				$mdgriffith$elm_ui$Element$row,
+				_List_Nil,
 				_List_fromArray(
-					[$author$project$Main$mathFont, $mdgriffith$elm_ui$Element$Font$italic]),
-				$mdgriffith$elm_ui$Element$text(syntax));
+					[
+						A2(
+						$mdgriffith$elm_ui$Element$el,
+						_List_Nil,
+						$mdgriffith$elm_ui$Element$text('     | ')),
+						show
+					]));
 		};
+		var viewSyntax = F3(
+			function (indexGrammer, indexSyntax, syntax) {
+				if ((editing.$ === 'Just') && (editing.a === 1)) {
+					return A2(
+						$mdgriffith$elm_ui$Element$Input$text,
+						_List_fromArray(
+							[
+								$author$project$Main$borderBottom,
+								$mdgriffith$elm_ui$Element$Border$dashed,
+								$mdgriffith$elm_ui$Element$Border$color($author$project$Main$gray),
+								A2($mdgriffith$elm_ui$Element$paddingXY, 3, 3),
+								$author$project$Main$mathFont,
+								$mdgriffith$elm_ui$Element$Font$italic
+							]),
+						{
+							label: $mdgriffith$elm_ui$Element$Input$labelHidden(
+								'Syntax number ' + $elm$core$String$fromInt(indexSyntax)),
+							onChange: A2($author$project$Main$OnGrammarEditSyntax, indexGrammer, indexSyntax),
+							placeholder: $elm$core$Maybe$Just(
+								A2($author$project$Main$placeholder, _List_Nil, 'a + b')),
+							text: syntax
+						});
+				} else {
+					return A2(
+						$mdgriffith$elm_ui$Element$el,
+						_List_fromArray(
+							[$author$project$Main$mathFont, $mdgriffith$elm_ui$Element$Font$italic]),
+						$mdgriffith$elm_ui$Element$text(syntax));
+				}
+			});
 		var viewStart = function (_var) {
 			return A2(
 				$mdgriffith$elm_ui$Element$row,
@@ -12882,38 +13110,45 @@ var $author$project$Main$viewGrammar = F2(
 						$mdgriffith$elm_ui$Element$text(' ::= '))
 					]));
 		};
-		var viewDeliniator = A2(
-			$mdgriffith$elm_ui$Element$el,
-			_List_Nil,
-			$mdgriffith$elm_ui$Element$text(' | '));
 		var viewSingle = F2(
-			function (isEditor, _v1) {
-				var _var = _v1.a;
-				var syntax = _v1.b;
+			function (indexGrammer, _v2) {
+				var _var = _v2.a;
+				var syntaxs = _v2.b;
 				return A2(
-					$mdgriffith$elm_ui$Element$row,
-					isEditor ? _List_fromArray(
+					$mdgriffith$elm_ui$Element$column,
+					_List_fromArray(
 						[
-							$mdgriffith$elm_ui$Element$Font$color($author$project$Main$gray)
-						]) : _List_Nil,
-					A2(
-						$elm$core$List$cons,
-						viewStart(_var),
-						A2(
-							$elm$core$List$intersperse,
-							viewDeliniator,
-							A2($elm$core$List$map, viewSyntax, syntax))));
+							$mdgriffith$elm_ui$Element$spacing(3)
+						]),
+					function () {
+						if (syntaxs.b) {
+							var one = syntaxs.a;
+							var remaining = syntaxs.b;
+							return _Utils_ap(
+								_List_fromArray(
+									[
+										A2(
+										$mdgriffith$elm_ui$Element$row,
+										_List_Nil,
+										_List_fromArray(
+											[
+												viewStart(_var),
+												A3(viewSyntax, indexGrammer, 0, one)
+											]))
+									]),
+								A2(
+									$elm$core$List$indexedMap,
+									F2(
+										function (i, s) {
+											return withDeliniator(
+												A3(viewSyntax, indexGrammer, i + 1, s));
+										}),
+									remaining));
+						} else {
+							return _List_Nil;
+						}
+					}());
 			});
-		var viewSyntaxEditor = _Utils_eq(
-			editing,
-			$elm$core$Maybe$Just(1)) ? A2(
-			viewSingle,
-			true,
-			A2(
-				$author$project$Main$Grammar,
-				'v',
-				_List_fromArray(
-					['a + b']))) : $mdgriffith$elm_ui$Element$none;
 		return A2(
 			$mdgriffith$elm_ui$Element$column,
 			_List_fromArray(
@@ -12922,13 +13157,10 @@ var $author$project$Main$viewGrammar = F2(
 					$mdgriffith$elm_ui$Element$centerX,
 					$mdgriffith$elm_ui$Element$spacing(20)
 				]),
-			_Utils_ap(
-				A2(
-					$elm$core$List$map,
-					viewSingle(false),
-					A2($elm$core$List$cons, first, rest)),
-				_List_fromArray(
-					[viewSyntaxEditor])));
+			A2(
+				$elm$core$List$indexedMap,
+				viewSingle,
+				A2($elm$core$List$cons, first, rest)));
 	});
 var $mdgriffith$elm_ui$Internal$Model$Min = F2(
 	function (a, b) {
@@ -13041,9 +13273,16 @@ var $author$project$Main$view = function (model) {
 							_List_Nil,
 							_List_fromArray(
 								[
-									$mdgriffith$elm_ui$Element$text('We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans.')
+									$mdgriffith$elm_ui$Element$text('For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression.')
 								])),
 							A3($author$project$Main$stepTitle, 1, 'Define the grammar', model.editing),
+							A2(
+							$mdgriffith$elm_ui$Element$paragraph,
+							_List_Nil,
+							_List_fromArray(
+								[
+									$mdgriffith$elm_ui$Element$text('We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans.')
+								])),
 							A2($author$project$Main$viewDomains, model.domains, model.editing),
 							A2($author$project$Main$viewGrammar, model.grammar, model.editing),
 							A3($author$project$Main$stepTitle, 2, 'Define the semantics', model.editing),

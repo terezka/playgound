@@ -30,7 +30,7 @@ type alias Model =
 
 
 type Domain
-  = Domain Int String (List String)
+  = Domain String (List String)
 
 
 type Semantics
@@ -73,10 +73,10 @@ init _ =
     , editing = Just 1
     , domains =
         OneOrMore
-          (Domain 1 "Variable" ["x", "y", "z"])
-          [ Domain 2 "Integer" ["n", "m"]
-          , Domain 3 "Expression" ["e", "e₀", "e₁"]
-          , Domain 4 "" []
+          (Domain "Variable" ["x", "y", "z"])
+          [ Domain "Integer" ["n", "m"]
+          , Domain "Expression" ["e", "e₀", "e₁"]
+          , Domain "" []
           ]
     , grammar =
         OneOrMore
@@ -107,37 +107,27 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
-    OnDomainEditVars searched vars ->
-      let updateOne (Domain id name existing) =
-            if searched == id then
-              Domain id name (String.split " , " vars)
-            else
-              Domain id name existing
+    OnDomainEditVars index vars ->
+      let update_ (Domain name _) =
+            Domain name (String.split " , " vars)
       in
-      ( { model | domains = OneOrMore.map updateOne model.domains }
+      ( { model | domains = OneOrMore.updateAt index update_ model.domains }
       , Cmd.none
       )
 
-    OnDomainEditName searched name ->
-      let updateOne (Domain id existing vars) =
-            if searched == id then
-              Domain id name vars
-            else
-              Domain id existing vars
+    OnDomainEditName index name ->
+      let update_ (Domain _ vars) =
+            Domain name vars
       in
-      ( { model | domains = OneOrMore.map updateOne model.domains }
+      ( { model | domains = OneOrMore.updateAt index update_ model.domains }
       , Cmd.none
       )
 
-    OnGrammarEditSyntax searchedGrammerId searchedSyntaxId syntax ->
-      let updateOne index (Grammar name existing) =
-            if searchedGrammerId == index then
-              List.indexedMap (\i s -> if i == searchedSyntaxId then syntax else s) existing
-                |> Grammar name
-            else
-              Grammar name existing
+    OnGrammarEditSyntax index syntaxIndex newSyntax ->
+      let update_ (Grammar name syntaxes) =
+            Grammar name (List.Extra.updateAt syntaxIndex (always newSyntax) syntaxes)
       in
-      ( { model | grammar = OneOrMore.indexedMap updateOne model.grammar }
+      ( { model | grammar = OneOrMore.updateAt index update_ model.grammar }
       , Cmd.none
       )
 
@@ -173,7 +163,7 @@ view model =
 
 viewDomains : OneOrMore Domain -> Maybe Int -> Element Msg
 viewDomains (OneOrMore first rest) editing =
-  let viewLeftSide (Domain id name vars) =
+  let viewLeftSide index (Domain name vars) =
         case editing of
           Just 1 ->
             Input.text
@@ -185,22 +175,22 @@ viewDomains (OneOrMore first rest) editing =
               , paddingXY 3 3
               , Font.alignRight
               ]
-              { onChange = OnDomainEditVars id
+              { onChange = OnDomainEditVars index
               , text = String.join ", " vars
               , placeholder = Just (placeholder [El.alignRight] "a, b, c")
-              , label = Input.labelHidden ("Variables of domain number " ++ String.fromInt id)
+              , label = Input.labelHidden ("Variables of domain number " ++ String.fromInt index)
               }
 
           _ ->
             el [ mathFont, italic, Font.alignRight ] (text (String.join ", " vars))
 
-      viewMiddle (Domain id name vars) =
+      viewMiddle _ (Domain name vars) =
         if String.isEmpty name && List.isEmpty vars then
             el [ mathFont, Font.color gray ] (text " ∈ ")
         else
             el [ mathFont ] (text " ∈ ")
 
-      viewRightSide (Domain id name vars) =
+      viewRightSide index (Domain name vars) =
         case editing of
           Just 1 ->
             Input.text
@@ -209,17 +199,17 @@ viewDomains (OneOrMore first rest) editing =
               , Border.color gray
               , paddingXY 3 3
               ]
-              { onChange = OnDomainEditName id
+              { onChange = OnDomainEditName index
               , text = name
               , placeholder = Just (placeholder [] "Another")
-              , label = Input.labelHidden ("Name of domain number " ++ String.fromInt id)
+              , label = Input.labelHidden ("Name of domain number " ++ String.fromInt index)
               }
 
           _ ->
             el [ boldFont, bold ] (text name)
   in
   el [ centerX, paddingXY 0 20 ] <|
-    table
+    indexedTable
       [ centerX, spacing 5 ]
       { data = first :: rest
       , columns =
