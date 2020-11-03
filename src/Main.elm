@@ -230,7 +230,18 @@ view model =
             , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
 
             , case model.result of -- TODO
-                Err errors -> row [] (List.map text errors)
+                Err [] -> none
+
+                Err errors ->
+                  el [paddingTRBL 20 0 0 0, width fill] <|
+                   row
+                    [ Border.color black
+                    , Border.width 1
+                    , paddingXY 20 10
+                    , width fill
+                    ]
+                    (List.map text errors)
+
                 Ok _ -> none
 
             , stepTitle 1 "Define the grammar" model.editing
@@ -439,6 +450,16 @@ stepTitle number string editing =
 gray : Color
 gray =
   rgb255 175 175 175
+
+
+black : Color
+black =
+  rgb255 0 0 0
+
+
+paddingTRBL : Int -> Int -> Int -> Int -> Attribute Msg
+paddingTRBL top right bottom left =
+  paddingEach { top = top, left = left, right = right, bottom = bottom }
 
 
 borderBottom : Attribute Msg
