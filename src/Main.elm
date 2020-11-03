@@ -1,13 +1,16 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Dom as Dom
 import Element.Border as Border
 import Element.Input as Input
 import Element as El exposing (..)
 import Element.Font as Font exposing (..)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 import List.Extra
+import Html.Attributes
 import Set exposing (Set)
+import Task
 import Data.Domain as Domain exposing (Domain(..))
 import Data.Grammar as Grammar exposing (Grammar(..))
 
@@ -96,7 +99,8 @@ init _ =
 
 
 type Msg
-  = OnToggleEdit Int
+  = NoOp
+  | OnToggleEdit Int
   | OnDomainEditVars Int String
   | OnDomainEditName Int String
   | OnGrammarEditSyntax Int Int String
@@ -105,6 +109,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
+    NoOp ->
+      ( model, Cmd.none )
+
     OnToggleEdit step ->
       ( if Set.member step model.editing
             then
@@ -129,19 +136,29 @@ update msg model =
               , domains = OneOrMore.add (Domain "" []) model.domains
               , grammars =
                   model.grammars
-                    |> OneOrMore.map Grammar.withPlaceholder
-                    |> OneOrMore.add (Grammar.init "" "" [])
+                    |> OneOrMore.map Grammar.withEmpty
+                    |> OneOrMore.add Grammar.empty
               }
 
       , Cmd.none
       )
 
     OnDomainEditVars index vars ->
-      let update_ (Domain name _) =
-            Domain name (String.split " , " vars)
+      let isLast =
+            OneOrMore.isLast index model.domains
+
+          update_ (Domain name _) =
+            Domain name (String.split ", " vars)
       in
-      ( { model | domains = OneOrMore.updateAt index update_ model.domains }
-      , Cmd.none
+      ( { model
+        | domains =
+            OneOrMore.updateAt index update_ model.domains
+              |> (if isLast then OneOrMore.add Domain.empty else identity)
+        }
+      , if isLast then
+          refocus -33 (domainVarsId index)
+        else
+          Cmd.none
       )
 
     OnDomainEditName index name ->
@@ -153,12 +170,34 @@ update msg model =
       )
 
     OnGrammarEditSyntax index syntaxIndex newSyntax ->
-      let update_ (Grammar name syntaxes) =
-            Grammar name (OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes)
+      let isLast =
+            OneOrMore.getAt index model.grammars
+              |> Maybe.map (Grammar.syntaxes >> OneOrMore.isLast syntaxIndex)
+              |> Maybe.withDefault False
+
+          update_ (Grammar name syntaxes) =
+            OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes
+              |> (if isLast then OneOrMore.add "" else identity)
+              |> Grammar name
       in
-      ( { model | grammars = OneOrMore.updateAt index update_ model.grammars }
+      ( { model
+        | grammars =
+            OneOrMore.updateAt index update_ model.grammars
+        }
       , Cmd.none
       )
+
+
+refocus : Float -> String -> Cmd Msg
+refocus px id =
+  Dom.focus id
+    |> Task.andThen (\_ -> Dom.getViewport)
+    |> Task.andThen (\{viewport} -> Dom.setViewport viewport.x (viewport.y + px)) -- TODO
+    |> Task.attempt (\_ -> NoOp)
+
+
+
+-- VIEW
 
 
 view : Model -> Browser.Document Msg
@@ -206,6 +245,7 @@ viewDomains (OneOrMore first rest) editing =
               , Border.color gray
               , paddingXY 3 3
               , Font.alignRight
+              , htmlAttribute (Html.Attributes.id (domainVarsId index))
               ]
               { onChange = OnDomainEditVars index
               , text = String.join ", " vars
@@ -281,6 +321,7 @@ viewGrammar (OneOrMore first rest) editing =
               , paddingXY 3 3
               , mathFont
               , italic
+              , htmlAttribute (Html.Attributes.id (grammarSyntaxId indexGrammer indexSyntax))
               ]
               { onChange = OnGrammarEditSyntax indexGrammer indexSyntax
               , text = syntax
@@ -369,3 +410,16 @@ mathFont =
 boldFont : Attribute Msg
 boldFont =
   family [ typeface "LMRoman10-Bold", sansSerif ]
+
+
+-- IDS
+
+
+domainVarsId : Int -> String
+domainVarsId index =
+  "domain-vars-" ++ String.fromInt index
+
+
+grammarSyntaxId : Int -> Int -> String
+grammarSyntaxId index syntaxIndex =
+  "grammar-syntaxes-" ++ String.fromInt index ++ "-" ++ String.fromInt syntaxIndex

@@ -1,4 +1,4 @@
-module Data.Grammar exposing (Grammar(..), init, isEmpty, withPlaceholder, clean)
+module Data.Grammar exposing (Grammar(..), syntaxes, init, empty, isEmpty, withEmpty, clean)
 
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 
@@ -6,25 +6,35 @@ type Grammar
   = Grammar String (OneOrMore String)
 
 
+syntaxes : Grammar -> OneOrMore String
+syntaxes (Grammar _ syntaxes_) =
+  syntaxes_
+
+
 init : String -> String -> List String -> Grammar
 init name one more =
   Grammar name (OneOrMore one more)
 
 
+empty : Grammar
+empty =
+  init "" "" []
+
+
 isEmpty : Grammar -> Bool
-isEmpty (Grammar name syntaxes) =
-  case OneOrMore.filter String.isEmpty syntaxes of
-    Just syntaxes_ -> String.isEmpty (String.trim name)
+isEmpty (Grammar name syntaxes_) =
+  case OneOrMore.filter String.isEmpty syntaxes_ of
+    Just syntaxes__ -> String.isEmpty (String.trim name)
     Nothing -> False
 
 
-withPlaceholder : Grammar -> Grammar
-withPlaceholder (Grammar name syntaxes) =
-  Grammar name (OneOrMore.add "" syntaxes)
+withEmpty : Grammar -> Grammar
+withEmpty (Grammar name syntaxes_) =
+  Grammar name (OneOrMore.add "" syntaxes_)
 
 
 clean : Grammar -> Maybe Grammar
-clean (Grammar name syntaxes) =
-  case OneOrMore.filter (not << String.isEmpty) syntaxes of
-    Just syntaxes_ -> Just (Grammar (String.trim name) syntaxes_)
+clean (Grammar name syntaxes_) =
+  case OneOrMore.filter (not << String.isEmpty) syntaxes_ of
+    Just syntaxes__ -> Just (Grammar (String.trim name) syntaxes__)
     Nothing -> Nothing
