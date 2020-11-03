@@ -309,40 +309,55 @@ viewDomains (OneOrMore first rest) editing =
 
 viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
 viewGrammar (OneOrMore first rest) editing =
-  let viewOne index (Grammar variable (OneOrMore syntax syntaxs) as grammar) =
-        column [ spacing 3 ] <|
-          [ row [] [ viewStart index grammar, viewSyntax index 0 syntax ]
-          ]
-          ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax index (i + 1) s)) syntaxs)
-
-      viewStart index grammar =
-        row [] <|
-          if Set.member 1 editing then
-            [ Input.text
-                [ borderBottom
-                , Border.dashed
-                , Border.color gray
-                , width (px 30)
-                , paddingXY 3 3
-                , mathFont
-                , italic
-                ]
-                { onChange = OnGrammarEditName index
-                , text = Grammar.variable grammar
-                , placeholder = Just (placeholder [] "a")
-                , label = Input.labelHidden ("Grammar number " ++ String.fromInt index)
+  let viewOne index grammar =
+        indexedTable
+          [ centerX, spacing 5 ]
+          { data = OneOrMore.all (Grammar.syntaxes grammar)
+          , columns =
+              [ { header = none
+                , width = px 30
+                , view = viewLeftSide grammar index
                 }
-            , el (if Grammar.isEmpty grammar then [Font.color gray] else []) (text " ::= ")
-            ]
+              , { header = none
+                , width = shrink
+                , view = viewMiddle grammar index
+                }
+              , { header = none
+                , width = shrink
+                , view = viewRightSide grammar index
+                }
+              ]
+          }
+
+      viewLeftSide grammar index syntaxIndex _ =
+        if syntaxIndex /= 0 then
+          none
+        else if Set.member 1 editing then
+          Input.text
+              [ borderBottom
+              , Border.dashed
+              , Border.color gray
+              , width (px 30)
+              , paddingXY 3 3
+              , mathFont
+              , italic
+              , Font.alignRight
+              ]
+              { onChange = OnGrammarEditName index
+              , text = Grammar.variable grammar
+              , placeholder = Just (placeholder [El.alignRight] "a")
+              , label = Input.labelHidden ("Grammar number " ++ String.fromInt index)
+              }
         else
-          [ el [ mathFont, italic ] (text (Grammar.variable grammar))
-          , el [] (text " ::= ")
-          ]
+          el [ mathFont, italic, Font.alignRight ] (text (Grammar.variable grammar))
 
-      withDeliniator show  =
-        row [] [ el [] (text "     | "), show ]
+      viewMiddle grammar _ syntaxIndex _ =
+        if syntaxIndex == 0 then
+          el (if Grammar.isEmpty grammar then [ Font.alignRight, Font.color gray ] else [Font.alignRight]) (text " ::=")
+        else
+          el [Font.alignRight] (text "|")
 
-      viewSyntax index indexSyntax syntax =
+      viewRightSide grammar index syntaxIndex syntax =
         if Set.member 1 editing then
             Input.text
               [ borderBottom
@@ -351,12 +366,12 @@ viewGrammar (OneOrMore first rest) editing =
               , paddingXY 3 3
               , mathFont
               , italic
-              , htmlAttribute (Html.Attributes.id (grammarSyntaxId index indexSyntax))
+              , htmlAttribute (Html.Attributes.id (grammarSyntaxId index syntaxIndex))
               ]
-              { onChange = OnGrammarEditSyntax index indexSyntax
+              { onChange = OnGrammarEditSyntax index syntaxIndex
               , text = syntax
               , placeholder = Just (placeholder [] "a + b")
-              , label = Input.labelHidden ("Syntax number " ++ String.fromInt indexSyntax)
+              , label = Input.labelHidden ("Syntax number " ++ String.fromInt syntaxIndex)
               }
         else
           el [ mathFont, italic ] (text syntax)
