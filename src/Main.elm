@@ -7,6 +7,7 @@ import Element as El exposing (..)
 import Element.Font as Font exposing (..)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 import List.Extra
+import Set exposing (Set)
 
 
 main =
@@ -20,7 +21,7 @@ main =
 
 type alias Model =
   { template : Maybe Language
-  , editing : Maybe Int
+  , editing : Set Int
   , domains : OneOrMore Domain
   , grammar : OneOrMore Grammar
   , semantics : OneOrMore Semantics
@@ -70,7 +71,7 @@ type alias Error
 init : () -> ( Model, Cmd Msg )
 init _ =
   ( { template = Nothing
-    , editing = Just 1
+    , editing = Set.singleton 1
     , domains =
         OneOrMore
           (Domain "Variable" ["x", "y", "z"])
@@ -99,7 +100,8 @@ init _ =
 
 
 type Msg
-  = OnDomainEditVars Int String
+  = OnToggleEdit Int
+  | OnDomainEditVars Int String
   | OnDomainEditName Int String
   | OnGrammarEditSyntax Int Int String
 
@@ -107,6 +109,14 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
+    OnToggleEdit step ->
+      ( { model | editing =
+          if Set.member step model.editing
+            then Set.remove step model.editing
+            else Set.insert step model.editing
+        }
+      , Cmd.none
+      )
     OnDomainEditVars index vars ->
       let update_ (Domain name _) =
             Domain name (String.split " , " vars)
@@ -161,11 +171,10 @@ view model =
   }
 
 
-viewDomains : OneOrMore Domain -> Maybe Int -> Element Msg
+viewDomains : OneOrMore Domain -> Set Int -> Element Msg
 viewDomains (OneOrMore first rest) editing =
   let viewLeftSide index (Domain name vars) =
-        case editing of
-          Just 1 ->
+        if Set.member 1 editing then
             Input.text
               [ mathFont
               , italic
@@ -180,9 +189,8 @@ viewDomains (OneOrMore first rest) editing =
               , placeholder = Just (placeholder [El.alignRight] "a, b, c")
               , label = Input.labelHidden ("Variables of domain number " ++ String.fromInt index)
               }
-
-          _ ->
-            el [ mathFont, italic, Font.alignRight ] (text (String.join ", " vars))
+        else
+          el [ mathFont, italic, Font.alignRight ] (text (String.join ", " vars))
 
       viewMiddle _ (Domain name vars) =
         if String.isEmpty name && List.isEmpty vars then
@@ -191,37 +199,35 @@ viewDomains (OneOrMore first rest) editing =
             el [ mathFont ] (text " ∈ ")
 
       viewRightSide index (Domain name vars) =
-        case editing of
-          Just 1 ->
-            Input.text
-              [ borderBottom
-              , Border.dashed
-              , Border.color gray
-              , paddingXY 3 3
-              ]
-              { onChange = OnDomainEditName index
-              , text = name
-              , placeholder = Just (placeholder [] "Another")
-              , label = Input.labelHidden ("Name of domain number " ++ String.fromInt index)
-              }
-
-          _ ->
-            el [ boldFont, bold ] (text name)
+        if Set.member 1 editing then
+          Input.text
+            [ borderBottom
+            , Border.dashed
+            , Border.color gray
+            , paddingXY 3 3
+            ]
+            { onChange = OnDomainEditName index
+            , text = name
+            , placeholder = Just (placeholder [] "Another")
+            , label = Input.labelHidden ("Name of domain number " ++ String.fromInt index)
+            }
+        else
+          el [ boldFont, bold ] (text name)
   in
   el [ centerX, paddingXY 0 20 ] <|
     indexedTable
       [ centerX, spacing 5 ]
       { data = first :: rest
       , columns =
-          [ { header = text ""
+          [ { header = none
             , width = shrink
             , view = viewLeftSide
             }
-          , { header = text ""
+          , { header = none
             , width = shrink
             , view = viewMiddle
             }
-          , { header = text ""
+          , { header = none
             , width = shrink
             , view = viewRightSide
             }
@@ -229,7 +235,7 @@ viewDomains (OneOrMore first rest) editing =
       }
 
 
-viewGrammar : OneOrMore Grammar -> Maybe Int -> Element Msg
+viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
 viewGrammar (OneOrMore first rest) editing =
   let viewSingle indexGrammer (Grammar var syntaxs) =
         column [ spacing 3 ] <|
@@ -249,8 +255,7 @@ viewGrammar (OneOrMore first rest) editing =
         row [] [ el [] (text "     | "), show ]
 
       viewSyntax indexGrammer indexSyntax syntax =
-        case editing of
-          Just 1 ->
+        if Set.member 1 editing then
             Input.text
               [ borderBottom
               , Border.dashed
@@ -264,8 +269,8 @@ viewGrammar (OneOrMore first rest) editing =
               , placeholder = Just (placeholder [] "a + b")
               , label = Input.labelHidden ("Syntax number " ++ String.fromInt indexSyntax)
               }
-
-          _ -> el [ mathFont, italic ] (text syntax)
+        else
+          el [ mathFont, italic ] (text syntax)
   in
   column
     [ paddingXY 0 30, centerX, spacing 20 ]
@@ -287,7 +292,7 @@ viewSemantics (OneOrMore first rest) =
               [ width (fill |> minimum 200)
               , borderBottom
               ]
-              (text "")
+              none
           , el [ centerX, paddingXY 0 5 ] (viewStep conclusion)
           ]
 
@@ -308,11 +313,16 @@ title string =
   el [ paddingXY 0 40, centerX, size 35 ] (text string)
 
 
-stepTitle : Int -> String -> Maybe Int -> Element Msg
+stepTitle : Int -> String -> Set Int -> Element Msg
 stepTitle number string editing =
   row [ width fill ]
     [ el [ paddingXY 0 30, El.alignLeft, size 25 ] (text <| String.fromInt number ++ ". " ++ string)
-    , el [ El.alignRight, underline, size 16 ] (text (if editing == Just number then "Save" else "Edit"))
+    , el [ El.alignRight, underline, size 16 ] <|
+        Input.button
+          []
+          { onPress = Just (OnToggleEdit number)
+          , label = text (if Set.member number editing then "Save" else "Edit")
+          }
     ]
 
 
