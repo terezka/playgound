@@ -228,7 +228,6 @@ view model =
             ]
             [ title "Programming Language Playground"
             , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
-
             , case model.result of -- TODO
                 Err [] -> none
 
@@ -243,18 +242,13 @@ view model =
                     (List.map text errors)
 
                 Ok _ -> none
-
             , stepTitle 1 "Define the grammar" model.editing
             , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
             , viewDomains model.domains model.editing
             , viewGrammar model.grammars model.editing
-            -- , viewErrors onlyGrammar model.result
             , stepTitle 2 "Define the semantics" model.editing
             , viewSemantics model.semantics
-            -- , viewErrors onlySemantics model.result
             , stepTitle 3 "Evaluate an expression" model.editing
-            -- , editor model.expression
-            -- , viewSteps model.result
             ]
       ]
   }
