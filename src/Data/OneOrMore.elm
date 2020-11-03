@@ -1,4 +1,4 @@
-module Data.OneOrMore exposing (OneOrMore(..), map, indexedMap, filter, all, add, updateAt)
+module Data.OneOrMore exposing (OneOrMore(..), map, indexedMap, filter, filterMap, all, add, updateAt)
 
 
 type OneOrMore a
@@ -18,6 +18,13 @@ add value (OneOrMore first rest) =
 filter : (a -> Bool) -> OneOrMore a -> Maybe (OneOrMore a)
 filter func values =
   case List.filter func (all values) of
+    [] -> Nothing
+    first :: rest -> Just (OneOrMore first rest)
+
+
+filterMap : (a -> Maybe a) -> OneOrMore a -> Maybe (OneOrMore a)
+filterMap func values =
+  case List.filterMap func (all values) of
     [] -> Nothing
     first :: rest -> Just (OneOrMore first rest)
 

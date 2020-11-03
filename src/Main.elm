@@ -8,6 +8,8 @@ import Element.Font as Font exposing (..)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 import List.Extra
 import Set exposing (Set)
+import Data.Domain as Domain exposing (Domain(..))
+import Data.Grammar as Grammar exposing (Grammar(..))
 
 
 main =
@@ -23,15 +25,11 @@ type alias Model =
   { template : Maybe Language
   , editing : Set Int
   , domains : OneOrMore Domain
-  , grammar : OneOrMore Grammar
+  , grammars : OneOrMore Grammar
   , semantics : OneOrMore Semantics
   , expression : String
   , result : Result (List Error) (List State)
   }
-
-
-type Domain
-  = Domain String (List String)
 
 
 type Semantics
@@ -47,18 +45,17 @@ type alias Variable
   = String
 
 
-type Grammar
-  = Grammar String (List String)
-
-
 type alias Expression
   = String
+
 
 type alias Language
   = String
 
+
 type alias State
   = String
+
 
 type alias Error
   = String
@@ -71,16 +68,16 @@ type alias Error
 init : () -> ( Model, Cmd Msg )
 init _ =
   ( { template = Nothing
-    , editing = Set.singleton 1
+    , editing = Set.empty
     , domains =
         OneOrMore
           (Domain "Variable" ["x", "y", "z"])
           [ Domain "Integer" ["n", "m"]
           , Domain "Expression" ["e", "e₀", "e₁"]
           ]
-    , grammar =
+    , grammars =
         OneOrMore
-          (Grammar "e" [ "x", "n", "e1 + e2", "e1 × e2", "x := e1;e2" ])
+          (Grammar.init "e" "x" [ "n", "e1 + e2", "e1 × e2", "x := e1;e2" ])
           []
     , semantics =
         OneOrMore
@@ -111,12 +108,18 @@ update msg model =
     OnToggleEdit step ->
       ( if Set.member step model.editing
             then
-              case OneOrMore.filter ((/=) (Domain "" [])) model.domains of
+              case OneOrMore.filter Domain.isEmpty model.domains of
                 Just domains ->
-                  { model
-                  | editing = Set.remove step model.editing
-                  , domains = domains
-                  }
+                  case OneOrMore.filterMap Grammar.clean model.grammars of
+                    Just grammars ->
+                      { model
+                      | editing = Set.remove step model.editing
+                      , domains = domains
+                      , grammars = grammars
+                      }
+
+                    Nothing ->
+                      { model | result = Err [ "You must have at least one grammar." ] }
 
                 Nothing ->
                   { model | result = Err [ "You must have at least one set." ] }
@@ -124,10 +127,15 @@ update msg model =
               { model
               | editing = Set.insert step model.editing
               , domains = OneOrMore.add (Domain "" []) model.domains
+              , grammars =
+                  model.grammars
+                    |> OneOrMore.map Grammar.withPlaceholder
+                    |> OneOrMore.add (Grammar.init "" "" [])
               }
 
       , Cmd.none
       )
+
     OnDomainEditVars index vars ->
       let update_ (Domain name _) =
             Domain name (String.split " , " vars)
@@ -146,9 +154,9 @@ update msg model =
 
     OnGrammarEditSyntax index syntaxIndex newSyntax ->
       let update_ (Grammar name syntaxes) =
-            Grammar name (List.Extra.updateAt syntaxIndex (always newSyntax) syntaxes)
+            Grammar name (OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes)
       in
-      ( { model | grammar = OneOrMore.updateAt index update_ model.grammar }
+      ( { model | grammars = OneOrMore.updateAt index update_ model.grammars }
       , Cmd.none
       )
 
@@ -173,7 +181,7 @@ view model =
             , stepTitle 1 "Define the grammar" model.editing
             , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
             , viewDomains model.domains model.editing
-            , viewGrammar model.grammar model.editing
+            , viewGrammar model.grammars model.editing
             -- , viewErrors onlyGrammar model.result
             , stepTitle 2 "Define the semantics" model.editing
             , viewSemantics model.semantics
@@ -252,16 +260,11 @@ viewDomains (OneOrMore first rest) editing =
 
 viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
 viewGrammar (OneOrMore first rest) editing =
-  let viewSingle indexGrammer (Grammar var syntaxs) =
+  let viewSingle indexGrammer (Grammar var (OneOrMore syntax syntaxs)) =
         column [ spacing 3 ] <|
-          case syntaxs of
-            one :: remaining ->
-              [ row [] [ viewStart var, viewSyntax indexGrammer 0 one ]
-              ]
-              ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax indexGrammer (i + 1) s)) remaining)
-
-            [] ->
-              []
+          [ row [] [ viewStart var, viewSyntax indexGrammer 0 syntax ]
+          ]
+          ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax indexGrammer (i + 1) s)) syntaxs)
 
       viewStart var =
         row [] [ el [ mathFont, italic ] (text var), el [] (text " ::= ") ]
