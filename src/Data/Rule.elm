@@ -1,4 +1,4 @@
-module Data.Rule exposing (Rule(..), Step(..), conditions, empty, withEmpty)
+module Data.Rule exposing (Rule(..), Step(..), conditions, empty, withEmpty, clean)
 
 
 type Rule
@@ -22,3 +22,14 @@ empty =
 withEmpty : Rule -> Rule
 withEmpty (Rule conds conclusion) =
   Rule (conds ++ [Step "" ""]) conclusion
+
+
+clean : Rule -> Maybe Rule
+clean (Rule conds conclusion) =
+  let isStepEmpty (Step a b) =
+        String.isEmpty (String.trim a) || String.isEmpty (String.trim b)
+  in
+  if isStepEmpty conclusion then
+    Nothing
+  else
+    Just (Rule (List.filter (not << isStepEmpty) conds) conclusion)

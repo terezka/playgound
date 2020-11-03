@@ -15,6 +15,7 @@ import Task
 import Data.Domain as Domain exposing (Domain(..))
 import Data.Grammar as Grammar exposing (Grammar(..))
 import Data.Rule as Rule exposing (Rule(..), Step(..))
+import Language.SimpleLambdaCalculus
 import Ui.Input
 
 
@@ -62,22 +63,10 @@ init : () -> ( Model, Cmd Msg )
 init _ =
   ( { template = Nothing
     , editing = Set.empty
-    , domains =
-        OneOrMore
-          (Domain "Variable" ["x", "y", "z"])
-          [ Domain "Integer" ["n", "m"]
-          , Domain "Expression" ["e", "e₀", "e₁"]
-          ]
-    , grammars =
-        OneOrMore
-          (Grammar.init "e" "x" [ "n", "e1 + e2", "e1 × e2", "x := e1;e2" ])
-          []
-    , semantics =
-        OneOrMore
-          (Rule [] (Step "(λx. e) v" "e{v/x}"))
-          [ Rule [Step "e" "e′"] (Step "E[e]" "E[e′]")
-          ]
-    , expression = "(\\x.x)"
+    , domains = Language.SimpleLambdaCalculus.config.domains
+    , grammars = Language.SimpleLambdaCalculus.config.grammars
+    , semantics = Language.SimpleLambdaCalculus.config.semantics
+    , expression = Language.SimpleLambdaCalculus.config.expression
     , result = Err []
     }
   , Cmd.none
@@ -112,11 +101,17 @@ update msg model =
                 Just domains ->
                   case OneOrMore.filterMap Grammar.clean model.grammars of
                     Just grammars ->
-                      { model
-                      | editing = Set.remove step model.editing
-                      , domains = domains
-                      , grammars = grammars
-                      }
+                      case OneOrMore.filterMap Rule.clean model.semantics of
+                        Just semantics ->
+                          { model
+                          | editing = Set.remove step model.editing
+                          , domains = domains
+                          , grammars = grammars
+                          , semantics = semantics
+                          }
+
+                        Nothing ->
+                          { model | result = Err [ "You must have at least one semantic rule." ] }
 
                     Nothing ->
                       { model | result = Err [ "You must have at least one grammar." ] }
@@ -232,7 +227,7 @@ update msg model =
       ( { model
         | semantics =
             OneOrMore.updateAt index update_ model.semantics
-              |> (if isLast then OneOrMore.add Rule.empty else identity)
+              |> (if isLast then OneOrMore.add (Rule.withEmpty Rule.empty) else identity)
         }
       , Cmd.none
       )
@@ -276,7 +271,7 @@ view model =
             , regularFont
             ]
             [ title "Programming Language Playground"
-            , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
+            , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
             , case model.result of -- TODO
                 Err [] -> none
 
@@ -292,12 +287,17 @@ view model =
 
                 Ok _ -> none
             , stepTitle 1 "Define the grammar" model.editing
-            , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
+            , paragraph []
+                [ text
+                  """Here we specify our domains and our grammar. There are a few special domains.
+                  """
+                ]
             , viewDomains model.domains model.editing
             , viewGrammar model.grammars model.editing
             , stepTitle 2 "Define the semantics" model.editing
             , viewSemantics model.semantics model.editing
-            , stepTitle 3 "Evaluate an expression" model.editing
+            , el [ paddingXY 0 30, El.alignLeft, size 25 ] (text "3. Evaluate an expression")
+            , viewEvaluator model
             ]
       ]
   }
@@ -453,7 +453,7 @@ viewSemantics (OneOrMore first rest) editing =
                 ]
                 { onChange = OnRuleLeft index stepIndex
                 , text = a
-                , placeholder = "a"
+                , placeholder = "e"
                 , label = "Step number 1" -- TODO
                 , minWidth = 50
                 , rightAlign = True
@@ -465,7 +465,7 @@ viewSemantics (OneOrMore first rest) editing =
                 ]
                 { onChange = OnRuleRight index stepIndex
                 , text = b
-                , placeholder = "a'"
+                , placeholder = "e′"
                 , label = "Step number 2" -- TODO
                 , minWidth = 50
                 , rightAlign = False
@@ -479,8 +479,27 @@ viewSemantics (OneOrMore first rest) editing =
     (List.indexedMap viewRule (first :: rest))
 
 
+viewEvaluator : Model -> Element Msg
+viewEvaluator model =
+  el [width fill, paddingTRBL 0 0 70 0] <|
+    Input.multiline
+      [ Border.width 1
+      , Border.color black
+      , Border.rounded 0
+      , paddingTRBL 0 0 40 0
+      , width fill
+      , mathFont
+      ]
+      { onChange = \_ -> NoOp
+      , text = model.expression
+      , placeholder =
+          Just <| Input.placeholder [] (el [ Font.color gray ] (El.text "λx. x"))
+      , label = Input.labelHidden "Expression"
+      , spellcheck = False
+      }
 
--- VIEW ELEMENTS
+
+-- ELEMENTS
 
 
 title : String -> Element Msg
@@ -490,7 +509,8 @@ title string =
 
 stepTitle : Int -> String -> Set Int -> Element Msg
 stepTitle number string editing =
-  row [ width fill ]
+  row
+    [ width fill ]
     [ el [ paddingXY 0 30, El.alignLeft, size 25 ] (text <| String.fromInt number ++ ". " ++ string)
     , el [ El.alignRight, underline, size 16 ] <|
         Input.button
