@@ -355,10 +355,9 @@ viewGrammar (OneOrMore first rest) editing =
           el [ mathFont, italic, Font.alignRight ] (text (Grammar.variable grammar))
 
       viewMiddle grammar _ syntaxIndex _ =
-        if syntaxIndex == 0 then
-          el (if Grammar.isEmpty grammar then [ Font.alignRight, Font.color gray ] else [Font.alignRight]) (text " ::=")
-        else
-          el [Font.alignRight] (text "|")
+        el
+          (if Grammar.isEmpty grammar then [ Font.alignRight, Font.color gray ] else [Font.alignRight])
+          (text (if syntaxIndex == 0 then " ::=" else "|")) -- TODO
 
       viewRightSide grammar index syntaxIndex syntax =
         if Set.member 1 editing then
