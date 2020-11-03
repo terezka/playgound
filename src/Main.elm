@@ -77,11 +77,10 @@ init _ =
           (Domain "Variable" ["x", "y", "z"])
           [ Domain "Integer" ["n", "m"]
           , Domain "Expression" ["e", "e₀", "e₁"]
-          , Domain "" []
           ]
     , grammar =
         OneOrMore
-          (Grammar "e" [ "x", "n", "e1 + e2", "e1 × e2", "x := e1;e2", "" ])
+          (Grammar "e" [ "x", "n", "e1 + e2", "e1 × e2", "x := e1;e2" ])
           []
     , semantics =
         OneOrMore
@@ -110,11 +109,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
     OnToggleEdit step ->
-      ( { model | editing =
-          if Set.member step model.editing
-            then Set.remove step model.editing
-            else Set.insert step model.editing
-        }
+      ( if Set.member step model.editing
+            then
+              case OneOrMore.filter ((/=) (Domain "" [])) model.domains of
+                Just domains ->
+                  { model
+                  | editing = Set.remove step model.editing
+                  , domains = domains
+                  }
+
+                Nothing ->
+                  { model | result = Err [ "You must have at least one set." ] }
+            else
+              { model
+              | editing = Set.insert step model.editing
+              , domains = OneOrMore.add (Domain "" []) model.domains
+              }
+
       , Cmd.none
       )
     OnDomainEditVars index vars ->
@@ -154,7 +165,11 @@ view model =
             ]
             [ title "Programming Language Playground"
             , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
-            --, el [ centerX ] [ select OnTemplate languages ]
+
+            , case model.result of -- TODO
+                Err errors -> row [] (List.map text errors)
+                Ok _ -> none
+
             , stepTitle 1 "Define the grammar" model.editing
             , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
             , viewDomains model.domains model.editing
