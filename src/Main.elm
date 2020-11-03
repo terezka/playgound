@@ -6,6 +6,8 @@ import Element.Input as Input
 import Element as El exposing (..)
 import Element.Font as Font exposing (..)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
+import List.Extra
+
 
 main =
   Browser.document
@@ -74,10 +76,11 @@ init _ =
           (Domain 1 "Variable" ["x", "y", "z"])
           [ Domain 2 "Integer" ["n", "m"]
           , Domain 3 "Expression" ["e", "e₀", "e₁"]
+          , Domain 4 "" []
           ]
     , grammar =
         OneOrMore
-          (Grammar "e" [ "x", "n", "e1 + e2", "e1 × e2", "x := e1;e2" ])
+          (Grammar "e" [ "x", "n", "e1 + e2", "e1 × e2", "x := e1;e2", "" ])
           []
     , semantics =
         OneOrMore
@@ -98,6 +101,7 @@ init _ =
 type Msg
   = OnDomainEditVars Int String
   | OnDomainEditName Int String
+  | OnGrammarEditSyntax Int Int String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -125,6 +129,18 @@ update msg model =
       , Cmd.none
       )
 
+    OnGrammarEditSyntax searchedGrammerId searchedSyntaxId syntax ->
+      let updateOne index (Grammar name existing) =
+            if searchedGrammerId == index then
+              List.indexedMap (\i s -> if i == searchedSyntaxId then syntax else s) existing
+                |> Grammar name
+            else
+              Grammar name existing
+      in
+      ( { model | grammar = OneOrMore.indexedMap updateOne model.grammar }
+      , Cmd.none
+      )
+
 
 view : Model -> Browser.Document Msg
 view model =
@@ -137,9 +153,10 @@ view model =
             , family [ typeface "LMRoman10-Regular", sansSerif ]
             ]
             [ title "Programming Language Playground"
-            , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
+            , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
             --, el [ centerX ] [ select OnTemplate languages ]
             , stepTitle 1 "Define the grammar" model.editing
+            , paragraph [] [ text "We saw in class the lambda calculus extended with references. In this question, you will give a CPS translation from the lambda calculus with references to the lambda calculus with products, integers, and booleans." ]
             , viewDomains model.domains model.editing
             , viewGrammar model.grammar model.editing
             -- , viewErrors onlyGrammar model.result
@@ -170,7 +187,7 @@ viewDomains (OneOrMore first rest) editing =
               ]
               { onChange = OnDomainEditVars id
               , text = String.join ", " vars
-              , placeholder = Just (placeholder "a, b, c")
+              , placeholder = Just (placeholder [El.alignRight] "a, b, c")
               , label = Input.labelHidden ("Variables of domain number " ++ String.fromInt id)
               }
 
@@ -194,16 +211,16 @@ viewDomains (OneOrMore first rest) editing =
               ]
               { onChange = OnDomainEditName id
               , text = name
-              , placeholder = Just (placeholder "Another")
+              , placeholder = Just (placeholder [] "Another")
               , label = Input.labelHidden ("Name of domain number " ++ String.fromInt id)
               }
 
           _ ->
             el [ boldFont, bold ] (text name)
   in
-  el [ centerX ] <|
+  el [ centerX, paddingXY 0 20 ] <|
     table
-      [ centerX, spacing 7 ]
+      [ centerX, spacing 5 ]
       { data = first :: rest
       , columns =
           [ { header = text ""
@@ -224,28 +241,45 @@ viewDomains (OneOrMore first rest) editing =
 
 viewGrammar : OneOrMore Grammar -> Maybe Int -> Element Msg
 viewGrammar (OneOrMore first rest) editing =
-  let viewSingle isEditor (Grammar var syntax) =
-        row (if isEditor then [Font.color gray] else []) <|
-          viewStart var :: (List.intersperse viewDeliniator <| List.map viewSyntax syntax)
+  let viewSingle indexGrammer (Grammar var syntaxs) =
+        column [ spacing 3 ] <|
+          case syntaxs of
+            one :: remaining ->
+              [ row [] [ viewStart var, viewSyntax indexGrammer 0 one ]
+              ]
+              ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax indexGrammer (i + 1) s)) remaining)
+
+            [] ->
+              []
 
       viewStart var =
         row [] [ el [ mathFont, italic ] (text var), el [] (text " ::= ") ]
 
-      viewDeliniator =
-        el [] (text " | ")
+      withDeliniator show  =
+        row [] [ el [] (text "     | "), show ]
 
-      viewSyntax syntax =
-        el [ mathFont, italic ] (text syntax)
+      viewSyntax indexGrammer indexSyntax syntax =
+        case editing of
+          Just 1 ->
+            Input.text
+              [ borderBottom
+              , Border.dashed
+              , Border.color gray
+              , paddingXY 3 3
+              , mathFont
+              , italic
+              ]
+              { onChange = OnGrammarEditSyntax indexGrammer indexSyntax
+              , text = syntax
+              , placeholder = Just (placeholder [] "a + b")
+              , label = Input.labelHidden ("Syntax number " ++ String.fromInt indexSyntax)
+              }
 
-      viewSyntaxEditor =
-        if editing == Just 1 then
-          viewSingle True (Grammar "v" ["a + b"])
-        else
-          none
+          _ -> el [ mathFont, italic ] (text syntax)
   in
   column
     [ paddingXY 0 30, centerX, spacing 20 ]
-    (List.map (viewSingle False) (first :: rest) ++ [viewSyntaxEditor])
+    (List.indexedMap viewSingle (first :: rest))
 
 
 viewSemantics : OneOrMore Semantics -> Element Msg
@@ -302,10 +336,9 @@ borderBottom =
   Border.widthEach { top = 0, left = 0, right = 0, bottom = 1 }
 
 
-placeholder : String -> Input.Placeholder Msg
-placeholder string =
-  Input.placeholder [] (el [ Font.color gray ] (text string))
-
+placeholder : List (Attribute Msg) -> String -> Input.Placeholder Msg
+placeholder attrs string =
+  Input.placeholder [] (el (Font.color gray :: attrs) (text string))
 
 
 -- FONT

@@ -1,4 +1,4 @@
-module Data.OneOrMore exposing (OneOrMore(..), map, all)
+module Data.OneOrMore exposing (OneOrMore(..), map, indexedMap, all)
 
 
 type OneOrMore a
@@ -14,3 +14,7 @@ map : (a -> b) -> OneOrMore a -> OneOrMore b
 map func (OneOrMore first rest) =
   OneOrMore (func first) (List.map func rest)
 
+
+indexedMap : (Int -> a -> b) -> OneOrMore a -> OneOrMore b
+indexedMap func (OneOrMore first rest) =
+  OneOrMore (func 0 first) (List.indexedMap (\i a -> func (i + 1) a) rest)
