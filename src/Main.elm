@@ -103,6 +103,7 @@ type Msg
   | OnToggleEdit Int
   | OnDomainEditVars Int String
   | OnDomainEditName Int String
+  | OnGrammarEditName Int String
   | OnGrammarEditSyntax Int Int String
 
 
@@ -166,6 +167,14 @@ update msg model =
             Domain name vars
       in
       ( { model | domains = OneOrMore.updateAt index update_ model.domains }
+      , Cmd.none
+      )
+
+    OnGrammarEditName index name ->
+      let update_ (Grammar _ syntaxes) =
+            Grammar name syntaxes
+      in
+      ( { model | grammars = OneOrMore.updateAt index update_ model.grammars }
       , Cmd.none
       )
 
@@ -300,19 +309,40 @@ viewDomains (OneOrMore first rest) editing =
 
 viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
 viewGrammar (OneOrMore first rest) editing =
-  let viewSingle indexGrammer (Grammar var (OneOrMore syntax syntaxs)) =
+  let viewOne index (Grammar variable (OneOrMore syntax syntaxs) as grammar) =
         column [ spacing 3 ] <|
-          [ row [] [ viewStart var, viewSyntax indexGrammer 0 syntax ]
+          [ row [] [ viewStart index grammar, viewSyntax index 0 syntax ]
           ]
-          ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax indexGrammer (i + 1) s)) syntaxs)
+          ++ (List.indexedMap (\i s -> withDeliniator (viewSyntax index (i + 1) s)) syntaxs)
 
-      viewStart var =
-        row [] [ el [ mathFont, italic ] (text var), el [] (text " ::= ") ]
+      viewStart index grammar =
+        row [] <|
+          if Set.member 1 editing then
+            [ Input.text
+                [ borderBottom
+                , Border.dashed
+                , Border.color gray
+                , width (px 30)
+                , paddingXY 3 3
+                , mathFont
+                , italic
+                ]
+                { onChange = OnGrammarEditName index
+                , text = Grammar.variable grammar
+                , placeholder = Just (placeholder [] "a")
+                , label = Input.labelHidden ("Grammar number " ++ String.fromInt index)
+                }
+            , el (if Grammar.isEmpty grammar then [Font.color gray] else []) (text " ::= ")
+            ]
+        else
+          [ el [ mathFont, italic ] (text (Grammar.variable grammar))
+          , el [] (text " ::= ")
+          ]
 
       withDeliniator show  =
         row [] [ el [] (text "     | "), show ]
 
-      viewSyntax indexGrammer indexSyntax syntax =
+      viewSyntax index indexSyntax syntax =
         if Set.member 1 editing then
             Input.text
               [ borderBottom
@@ -321,9 +351,9 @@ viewGrammar (OneOrMore first rest) editing =
               , paddingXY 3 3
               , mathFont
               , italic
-              , htmlAttribute (Html.Attributes.id (grammarSyntaxId indexGrammer indexSyntax))
+              , htmlAttribute (Html.Attributes.id (grammarSyntaxId index indexSyntax))
               ]
-              { onChange = OnGrammarEditSyntax indexGrammer indexSyntax
+              { onChange = OnGrammarEditSyntax index indexSyntax
               , text = syntax
               , placeholder = Just (placeholder [] "a + b")
               , label = Input.labelHidden ("Syntax number " ++ String.fromInt indexSyntax)
@@ -333,12 +363,12 @@ viewGrammar (OneOrMore first rest) editing =
   in
   column
     [ paddingXY 0 30, centerX, spacing 20 ]
-    (List.indexedMap viewSingle (first :: rest))
+    (List.indexedMap viewOne (first :: rest))
 
 
 viewSemantics : OneOrMore Semantics -> Element Msg
 viewSemantics (OneOrMore first rest) =
-  let viewSingle semantics =
+  let viewOne semantics =
         case semantics of
           Axiom conclusion -> viewRule [] conclusion
           Rule precs conclusion -> viewRule precs conclusion
@@ -360,7 +390,7 @@ viewSemantics (OneOrMore first rest) =
   in
   row
     [ width fill, paddingXY 40 20, centerX, spacing 40 ]
-    (List.map viewSingle (first :: rest))
+    (List.map viewOne (first :: rest))
 
 
 

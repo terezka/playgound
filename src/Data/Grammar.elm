@@ -1,4 +1,4 @@
-module Data.Grammar exposing (Grammar(..), syntaxes, init, empty, isEmpty, withEmpty, clean)
+module Data.Grammar exposing (Grammar(..), variable, syntaxes, init, empty, isEmpty, withEmpty, clean)
 
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 
@@ -9,6 +9,11 @@ type Grammar
 syntaxes : Grammar -> OneOrMore String
 syntaxes (Grammar _ syntaxes_) =
   syntaxes_
+
+
+variable : Grammar -> String
+variable (Grammar var _) =
+  var
 
 
 init : String -> String -> List String -> Grammar
@@ -23,7 +28,7 @@ empty =
 
 isEmpty : Grammar -> Bool
 isEmpty (Grammar name syntaxes_) =
-  case OneOrMore.filter String.isEmpty syntaxes_ of
+  case OneOrMore.filter (String.isEmpty << String.trim) syntaxes_ of
     Just syntaxes__ -> String.isEmpty (String.trim name)
     Nothing -> False
 
