@@ -25,6 +25,6 @@ withPlaceholder (Grammar name syntaxes) =
 
 clean : Grammar -> Maybe Grammar
 clean (Grammar name syntaxes) =
-  case OneOrMore.filter String.isEmpty syntaxes of
+  case OneOrMore.filter (not << String.isEmpty) syntaxes of
     Just syntaxes_ -> Just (Grammar (String.trim name) syntaxes_)
     Nothing -> Nothing

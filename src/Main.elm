@@ -108,7 +108,7 @@ update msg model =
     OnToggleEdit step ->
       ( if Set.member step model.editing
             then
-              case OneOrMore.filter Domain.isEmpty model.domains of
+              case OneOrMore.filter (not << Domain.isEmpty) model.domains of
                 Just domains ->
                   case OneOrMore.filterMap Grammar.clean model.grammars of
                     Just grammars ->
