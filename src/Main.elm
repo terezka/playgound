@@ -180,20 +180,24 @@ update msg model =
 
     OnGrammarEditSyntax index syntaxIndex newSyntax ->
       let isLast =
+            OneOrMore.isLast index model.grammars
+
+          isLastSyntax =
             OneOrMore.getAt index model.grammars
               |> Maybe.map (Grammar.syntaxes >> OneOrMore.isLast syntaxIndex)
               |> Maybe.withDefault False
 
           update_ (Grammar name syntaxes) =
             OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes
-              |> (if isLast then OneOrMore.add "" else identity)
+              |> (if isLastSyntax then OneOrMore.add "" else identity)
               |> Grammar name
       in
       ( { model
         | grammars =
             OneOrMore.updateAt index update_ model.grammars
+              |> (if isLast then OneOrMore.add Grammar.empty else identity)
         }
-      , if isLast then
+      , if isLastSyntax then
           refocus -32 (grammarSyntaxId index syntaxIndex)
         else
           Cmd.none
