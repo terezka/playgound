@@ -157,7 +157,7 @@ update msg model =
               |> (if isLast then OneOrMore.add Domain.empty else identity)
         }
       , if isLast then
-          refocus -33 (domainVarsId index)
+          refocus -32 (domainVarsId index)
         else
           Cmd.none
       )
@@ -193,7 +193,10 @@ update msg model =
         | grammars =
             OneOrMore.updateAt index update_ model.grammars
         }
-      , Cmd.none
+      , if isLast then
+          refocus -32 (grammarSyntaxId index syntaxIndex)
+        else
+          Cmd.none
       )
 
 
