@@ -8,11 +8,14 @@ import Element as El exposing (..)
 import Element.Font as Font exposing (..)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 import List.Extra
+import Html
 import Html.Attributes
 import Set exposing (Set)
 import Task
 import Data.Domain as Domain exposing (Domain(..))
 import Data.Grammar as Grammar exposing (Grammar(..))
+import Data.Rule as Rule exposing (Rule(..), Step(..))
+import Ui.Input
 
 
 main =
@@ -29,26 +32,13 @@ type alias Model =
   , editing : Set Int
   , domains : OneOrMore Domain
   , grammars : OneOrMore Grammar
-  , semantics : OneOrMore Semantics
+  , semantics : OneOrMore Rule
   , expression : String
   , result : Result (List Error) (List State)
   }
 
 
-type Semantics
-  = Axiom Step
-  | Rule (List Step) Step
-
-
-type Step
-  = Step Expression Expression
-
-
 type alias Variable
-  = String
-
-
-type alias Expression
   = String
 
 
@@ -84,7 +74,7 @@ init _ =
           []
     , semantics =
         OneOrMore
-          (Axiom (Step "(λx. e) v" "e{v/x}"))
+          (Rule [] (Step "(λx. e) v" "e{v/x}"))
           [ Rule [Step "e" "e′"] (Step "E[e]" "E[e′]")
           ]
     , expression = "(\\x.x)"
@@ -105,6 +95,8 @@ type Msg
   | OnDomainEditName Int String
   | OnGrammarEditName Int String
   | OnGrammarEditSyntax Int Int String
+  | OnRuleRight Int Int String
+  | OnRuleLeft Int Int String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -134,11 +126,26 @@ update msg model =
             else
               { model
               | editing = Set.insert step model.editing
-              , domains = OneOrMore.add (Domain "" []) model.domains
+              , domains =
+                  if step == 1 then
+                    model.domains
+                      |> OneOrMore.add Domain.empty
+                  else
+                    model.domains
               , grammars =
-                  model.grammars
-                    |> OneOrMore.map Grammar.withEmpty
-                    |> OneOrMore.add Grammar.empty
+                  if step == 1 then
+                    model.grammars
+                      |> OneOrMore.map Grammar.withEmpty
+                      |> OneOrMore.add Grammar.empty
+                  else
+                    model.grammars
+              , semantics =
+                  if step == 2 then
+                    model.semantics
+                      |> OneOrMore.add Rule.empty
+                      |> OneOrMore.map Rule.withEmpty
+                  else
+                    model.semantics
               }
 
       , Cmd.none
@@ -203,6 +210,48 @@ update msg model =
           Cmd.none
       )
 
+    OnRuleLeft index ruleIndex new ->
+      let isLast =
+            OneOrMore.isLast index model.semantics
+
+          isLastCondition =
+            OneOrMore.getAt index model.semantics
+              |> Maybe.map ((==) (ruleIndex + 1) << List.length << Rule.conditions)
+              |> Maybe.withDefault False
+
+          update_ (Rule precs conclusion) =
+            if ruleIndex == -1 then
+              Rule precs (updateStep conclusion)
+            else
+              Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
+                |> (if isLastCondition then Rule.withEmpty else identity)
+
+          updateStep (Step a b) =
+            Step new b
+      in
+      ( { model
+        | semantics =
+            OneOrMore.updateAt index update_ model.semantics
+              |> (if isLast then OneOrMore.add Rule.empty else identity)
+        }
+      , Cmd.none
+      )
+
+    OnRuleRight index ruleIndex new ->
+      let update_ (Rule precs conclusion) =
+            if ruleIndex == -1 then
+              Rule precs (updateStep conclusion)
+            else
+              Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
+
+          updateStep (Step a b) =
+            Step a new
+      in
+      ( { model | semantics = OneOrMore.updateAt index update_ model.semantics }
+      , Cmd.none
+      )
+
+
 
 refocus : Float -> String -> Cmd Msg
 refocus px id =
@@ -224,7 +273,7 @@ view model =
           column
             [ width (px 900)
             , centerX
-            , family [ typeface "LMRoman10-Regular", sansSerif ]
+            , regularFont
             ]
             [ title "Programming Language Playground"
             , paragraph [] [ text "For each of the following simply-typed lambda calculus expressions (including products, sums, and references), state whether the expression is well-typed or not. If it is well-typed, then give the type of the expression." ]
@@ -247,7 +296,7 @@ view model =
             , viewDomains model.domains model.editing
             , viewGrammar model.grammars model.editing
             , stepTitle 2 "Define the semantics" model.editing
-            , viewSemantics model.semantics
+            , viewSemantics model.semantics model.editing
             , stepTitle 3 "Evaluate an expression" model.editing
             ]
       ]
@@ -258,20 +307,17 @@ viewDomains : OneOrMore Domain -> Set Int -> Element Msg
 viewDomains (OneOrMore first rest) editing =
   let viewLeftSide index (Domain name vars) =
         if Set.member 1 editing then
-            Input.text
+            Ui.Input.text
               [ mathFont
               , italic
-              , borderBottom
-              , Border.dashed
-              , Border.color gray
-              , paddingXY 3 3
-              , Font.alignRight
               , htmlAttribute (Html.Attributes.id (domainVarsId index))
               ]
               { onChange = OnDomainEditVars index
               , text = String.join ", " vars
-              , placeholder = Just (placeholder [El.alignRight] "a, b, c")
-              , label = Input.labelHidden ("Variables of domain number " ++ String.fromInt index)
+              , placeholder = "a, b, c"
+              , label = "Variables of domain number " ++ String.fromInt index
+              , minWidth = 70
+              , rightAlign = True
               }
         else
           el [ mathFont, italic, Font.alignRight ] (text (String.join ", " vars))
@@ -284,16 +330,14 @@ viewDomains (OneOrMore first rest) editing =
 
       viewRightSide index (Domain name vars) =
         if Set.member 1 editing then
-          Input.text
-            [ borderBottom
-            , Border.dashed
-            , Border.color gray
-            , paddingXY 3 3
-            ]
+          Ui.Input.text
+            []
             { onChange = OnDomainEditName index
             , text = name
-            , placeholder = Just (placeholder [] "Another")
-            , label = Input.labelHidden ("Name of domain number " ++ String.fromInt index)
+            , placeholder = "Another"
+            , label = "Name of domain number " ++ String.fromInt index
+            , minWidth = 100
+            , rightAlign = False
             }
         else
           el [ boldFont, bold ] (text name)
@@ -345,21 +389,17 @@ viewGrammar (OneOrMore first rest) editing =
         if syntaxIndex /= 0 then
           none
         else if Set.member 1 editing then
-          Input.text
-              [ borderBottom
-              , Border.dashed
-              , Border.color gray
-              , width (px 30)
-              , paddingXY 3 3
-              , mathFont
-              , italic
-              , Font.alignRight
-              ]
-              { onChange = OnGrammarEditName index
-              , text = Grammar.variable grammar
-              , placeholder = Just (placeholder [El.alignRight] "a")
-              , label = Input.labelHidden ("Grammar number " ++ String.fromInt index)
-              }
+          Ui.Input.text
+            [ mathFont
+            , italic
+            ]
+            { onChange = OnGrammarEditName index
+            , text = Grammar.variable grammar
+            , placeholder = "a"
+            , label = "Grammar number " ++ String.fromInt index
+            , minWidth = 30
+            , rightAlign = True
+            }
         else
           el [ mathFont, italic, Font.alignRight ] (text (Grammar.variable grammar))
 
@@ -370,20 +410,18 @@ viewGrammar (OneOrMore first rest) editing =
 
       viewRightSide grammar index syntaxIndex syntax =
         if Set.member 1 editing then
-            Input.text
-              [ borderBottom
-              , Border.dashed
-              , Border.color gray
-              , paddingXY 3 3
-              , mathFont
-              , italic
-              , htmlAttribute (Html.Attributes.id (grammarSyntaxId index syntaxIndex))
-              ]
-              { onChange = OnGrammarEditSyntax index syntaxIndex
-              , text = syntax
-              , placeholder = Just (placeholder [] "a + b")
-              , label = Input.labelHidden ("Syntax number " ++ String.fromInt syntaxIndex)
-              }
+          Ui.Input.text
+            [ mathFont
+            , italic
+            , htmlAttribute (Html.Attributes.id (grammarSyntaxId index syntaxIndex))
+            ]
+            { onChange = OnGrammarEditSyntax index syntaxIndex
+            , text = syntax
+            , placeholder = "a + b"
+            , label = "Syntax number " ++ String.fromInt syntaxIndex
+            , minWidth = 100
+            , rightAlign = False
+            }
         else
           el [ mathFont, italic ] (text syntax)
   in
@@ -392,31 +430,53 @@ viewGrammar (OneOrMore first rest) editing =
     (List.indexedMap viewOne (first :: rest))
 
 
-viewSemantics : OneOrMore Semantics -> Element Msg
-viewSemantics (OneOrMore first rest) =
-  let viewOne semantics =
-        case semantics of
-          Axiom conclusion -> viewRule [] conclusion
-          Rule precs conclusion -> viewRule precs conclusion
-
-      viewRule precs conclusion =
+viewSemantics : OneOrMore Rule -> Set Int -> Element Msg
+viewSemantics (OneOrMore first rest) editing =
+  let viewRule index (Rule precs conclusion) =
         column
           []
-          [ row [ height (px 25), centerX ] (List.map viewStep precs)
+          [ row [ height (px 25), centerX, paddingTRBL 0 0 5 0, spacing 30 ] (List.indexedMap (viewStep index) precs)
           , el
               [ width (fill |> minimum 200)
               , borderBottom
               ]
               none
-          , el [ centerX, paddingXY 0 5 ] (viewStep conclusion)
+          , el [ centerX, paddingXY 0 5 ] (viewStep index -1 conclusion)
           ]
 
-      viewStep (Step a b) =
-        el [ mathFont, italic ] (text (a ++ " → " ++ b))
+      viewStep index stepIndex (Step a b) =
+        if Set.member 2 editing then
+          row []
+            [ Ui.Input.text
+                [ mathFont
+                , italic
+                ]
+                { onChange = OnRuleLeft index stepIndex
+                , text = a
+                , placeholder = "a"
+                , label = "Step number 1" -- TODO
+                , minWidth = 50
+                , rightAlign = True
+                }
+            , el [ mathFont, italic ] (text " → ")
+            , Ui.Input.text
+                [ mathFont
+                , italic
+                ]
+                { onChange = OnRuleRight index stepIndex
+                , text = b
+                , placeholder = "a'"
+                , label = "Step number 2" -- TODO
+                , minWidth = 50
+                , rightAlign = False
+                }
+            ]
+        else
+          el [ mathFont, italic ] (text (a ++ " → " ++ b))
   in
-  row
+  wrappedRow
     [ width fill, paddingXY 40 20, centerX, spacing 40 ]
-    (List.map viewOne (first :: rest))
+    (List.indexedMap viewRule (first :: rest))
 
 
 
@@ -461,12 +521,14 @@ borderBottom =
   Border.widthEach { top = 0, left = 0, right = 0, bottom = 1 }
 
 
-placeholder : List (Attribute Msg) -> String -> Input.Placeholder Msg
-placeholder attrs string =
-  Input.placeholder [] (el (Font.color gray :: attrs) (text string))
-
 
 -- FONT
+
+
+regularFont : Attribute Msg
+regularFont =
+  family [ typeface "LMRoman10-Regular", sansSerif ]
+
 
 mathFont : Attribute Msg
 mathFont =
