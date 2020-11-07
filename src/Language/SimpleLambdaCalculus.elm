@@ -14,7 +14,7 @@ config =
           [ Domain.init "Variables" ["x", "y", "z", "w"]
           ]
     , grammars =
-        OneOrMore (Grammar.init "e" "λx. e" [ "e₁ e₂", "x", "(e)"])
+        OneOrMore (Grammar.init "e" (OneOrMore.init "λx. e" [ "e₁ e₂", "x", "(e)"]))
           []
     , semantics =
         OneOrMore (Rule [Step "e₁" "e₁′"] (Step "e₁ e₂" "e₁ e₂"))

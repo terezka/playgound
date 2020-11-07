@@ -1,4 +1,4 @@
-module Ui.Domains exposing (Model, init, validate, Msg, update, view, viewStatic)
+module Ui.Domains exposing (Model, init, validate, Msg, update, viewEditable, viewStatic)
 
 import Html
 import Html.Attributes
@@ -108,7 +108,7 @@ isFilledOutCorrectly values =
 hasUniqueNames : Model -> Result String Model
 hasUniqueNames values =
   let names =
-        OneOrMore.all values
+        OneOrMore.values values
           |> List.map .name
   in
   if onlyUnique names then
@@ -130,7 +130,7 @@ hasUniqueVariables values =
         )
 
       allUnique =
-        OneOrMore.all processedValues
+        OneOrMore.values processedValues
           |> List.concatMap Tuple.second
           |> onlyUnique
   in
@@ -191,11 +191,11 @@ offset model newModel =
 
 
 viewStatic : OneOrMore Domain -> Element msg
-viewStatic values =
+viewStatic model =
   el [ centerX, paddingXY 0 20 ] <|
     table
       [ centerX, spacing 5 ]
-      { data = OneOrMore.all values
+      { data = OneOrMore.values model
       , columns =
           [ { header = none
             , width = shrink
@@ -222,12 +222,12 @@ viewStatic values =
 -- VIEW
 
 
-view : Model -> Element Msg
-view values =
+viewEditable : Model -> Element Msg
+viewEditable model =
   el [ centerX, paddingXY 0 20 ] <|
     indexedTable
       [ centerX, spacing 5 ]
-      { data = OneOrMore.all values
+      { data = OneOrMore.values model
       , columns =
           [ { header = none
             , width = shrink

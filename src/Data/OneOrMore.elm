@@ -1,4 +1,4 @@
-module Data.OneOrMore exposing (OneOrMore(..), init, any, length, map, indexedMap, filter, filterMap, all, add, updateAt, getAt, isLast, trailing)
+module Data.OneOrMore exposing (OneOrMore(..), init, any, all, length, map, indexedMap, filter, filterMap, values, add, updateAt, getAt, isLast, trailing)
 
 
 type OneOrMore a
@@ -12,17 +12,17 @@ init =
 
 length : OneOrMore a -> Int
 length =
-  List.length << all
+  List.length << values
 
 
-all : OneOrMore a -> List a
-all (OneOrMore one rest) =
+values : OneOrMore a -> List a
+values (OneOrMore one rest) =
   one :: rest
 
 
 fromList : List a -> Maybe (OneOrMore a)
-fromList values =
-  case values of
+fromList values_ =
+  case values_ of
     one :: more -> Just (OneOrMore one more)
     _ -> Nothing
 
@@ -38,20 +38,25 @@ add value (OneOrMore one rest) =
 
 
 any : (a -> Bool) -> OneOrMore a -> Bool
-any func values =
-  List.any func (all values)
+any func values_ =
+  List.any func (values values_)
+
+
+all : (a -> Bool) -> OneOrMore a -> Bool
+all func values_ =
+  List.all func (values values_)
 
 
 filter : (a -> Bool) -> OneOrMore a -> Maybe (OneOrMore a)
-filter func values =
-  case List.filter func (all values) of
+filter func values_ =
+  case List.filter func (values values_) of
     [] -> Nothing
     one :: rest -> Just (OneOrMore one rest)
 
 
 filterMap : (a -> Maybe b) -> OneOrMore a -> Maybe (OneOrMore b)
-filterMap func values =
-  case List.filterMap func (all values) of
+filterMap func values_ =
+  case List.filterMap func (values values_) of
     [] -> Nothing
     one :: rest -> Just (OneOrMore one rest)
 
@@ -76,16 +81,16 @@ updateAt searched func =
 
 
 getAt : Int -> OneOrMore a -> Maybe a
-getAt searched values =
-  values
+getAt searched values_ =
+  values_
     |> indexedMap (\index value -> if index == searched then Just value else Nothing)
     |> filterMap identity
     |> Maybe.map first
 
 
 isLast : Int -> OneOrMore a -> Bool
-isLast index values =
-  index == length values - 1
+isLast index values_ =
+  index == length values_ - 1
 
 
 trailing : (a -> Bool) -> OneOrMore a -> OneOrMore a

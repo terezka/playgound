@@ -19,6 +19,7 @@ import Data.Rule as Rule exposing (Rule(..), Step(..))
 import Language.SimpleLambdaCalculus
 import Ui.Input
 import Ui.Domains
+import Ui.Grammars
 
 
 main =
@@ -33,7 +34,7 @@ main =
 type alias Model =
   { validated : Language
   , domains : Maybe Ui.Domains.Model
-  , grammars : Maybe (OneOrMore Grammar)
+  , grammars : Maybe Ui.Grammars.Model
   , semantics : Maybe (OneOrMore Rule)
   , expression : String
   , result : Result (List String) ()
@@ -71,8 +72,7 @@ type Msg
   = NoOp
   | OnToggleEdit Int
   | DomainMsg Ui.Domains.Msg
-  | OnGrammarEditName Int String
-  | OnGrammarEditSyntax Int Int String
+  | GrammarMsg Ui.Grammars.Msg
   | OnRuleRight Int Int String
   | OnRuleLeft Int Int String
 
@@ -104,32 +104,29 @@ update msg ({validated} as model) =
                   )
 
                 Err error ->
-                  ( { model | result = Err [error] }
+                  ( { model | result = Err [ error ] }
                   , Cmd.none
                   )
 
         2 ->
           case model.grammars of
             Nothing ->
-              ( { model
-                | grammars =
-                    validated.grammars
-                      |> OneOrMore.map Grammar.withEmpty
-                      |> OneOrMore.add Grammar.empty
-                      |> Just
-                }
+              ( { model | grammars = Just (Ui.Grammars.init validated.grammars) }
               , Cmd.none
               )
 
             Just grammars ->
-              case OneOrMore.filterMap Grammar.clean grammars of
-                Just valid ->
-                  ( { model | grammars = Just valid }
+              case Ui.Grammars.validate grammars of
+                Ok valid ->
+                  ( { model
+                    | grammars = Nothing
+                    , result = Ok ()
+                    }
                   , Cmd.none
                   )
 
-                Nothing ->
-                  ( { model | result = Err [ "You must have at least one grammar." ] }
+                Err error ->
+                  ( { model | result = Err [ error ] }
                   , Cmd.none
                   )
 
@@ -146,46 +143,12 @@ update msg ({validated} as model) =
         Nothing ->
           ( model, Cmd.none )
 
-    OnGrammarEditName index name ->
+    GrammarMsg subMsg ->
       case model.grammars of
         Just grammars ->
-          let update_ (Grammar _ syntaxes) =
-                Grammar name syntaxes
-          in
-          ( { model | grammars = Just (OneOrMore.updateAt index update_ grammars) }
-          , Cmd.none
-          )
-
-        Nothing ->
-          ( model, Cmd.none )
-
-    OnGrammarEditSyntax index syntaxIndex newSyntax ->
-      case model.grammars of
-        Just grammars ->
-          let isLast =
-                OneOrMore.isLast index grammars
-
-              isLastSyntax =
-                OneOrMore.getAt index grammars
-                  |> Maybe.map (Grammar.syntaxes >> OneOrMore.isLast syntaxIndex)
-                  |> Maybe.withDefault False
-
-              update_ (Grammar name syntaxes) =
-                OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes
-                  |> (if isLastSyntax then OneOrMore.add "" else identity)
-                  |> Grammar name
-          in
-          ( { model
-            | grammars =
-                OneOrMore.updateAt index update_ grammars
-                  |> (if isLast then OneOrMore.add Grammar.empty else identity)
-                  |> Just
-            }
-          , if isLastSyntax then
-              refocus -32 (grammarSyntaxId index syntaxIndex)
-            else
-              Cmd.none
-          )
+          Ui.Grammars.update subMsg grammars
+            |> Tuple.mapFirst (\subModel -> { model | grammars = Just subModel })
+            |> Tuple.mapSecond (Cmd.map GrammarMsg)
 
         Nothing ->
           ( model, Cmd.none )
@@ -290,12 +253,17 @@ view model =
                 ]
             , case model.domains of
                 Just domains ->
-                  map DomainMsg (Ui.Domains.view domains)
+                  map DomainMsg (Ui.Domains.viewEditable domains)
 
                 Nothing ->
                   Ui.Domains.viewStatic model.validated.domains
-            --, stepTitle 1 "Define the grammar" model.editing
-            --, viewGrammar model.grammars model.editing
+            , stepTitle 2 "Define the grammar" model.grammars
+            , case model.grammars of
+                Just grammars ->
+                  map GrammarMsg (Ui.Grammars.viewEditable grammars)
+
+                Nothing ->
+                  Ui.Grammars.viewStatic model.validated.grammars
             --, stepTitle 2 "Define the semantics" model.editing
             --, viewSemantics model.semantics model.editing
             , el [ paddingXY 0 30, El.alignLeft, size 25 ] (text "3. Evaluate an expression")
@@ -303,73 +271,6 @@ view model =
             ]
       ]
   }
-
-
-viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
-viewGrammar (OneOrMore first rest) editing =
-  let viewOne index grammar =
-        indexedTable
-          [ centerX, spacing 5 ]
-          { data = OneOrMore.all (Grammar.syntaxes grammar)
-          , columns =
-              [ { header = none
-                , width = px 30
-                , view = viewLeftSide grammar index
-                }
-              , { header = none
-                , width = shrink
-                , view = viewMiddle grammar index
-                }
-              , { header = none
-                , width = shrink
-                , view = viewRightSide grammar index
-                }
-              ]
-          }
-
-      viewLeftSide grammar index syntaxIndex _ =
-        if syntaxIndex /= 0 then
-          none
-        else if Set.member 1 editing then
-          Ui.Input.text
-            [ mathFont
-            , italic
-            ]
-            { onChange = OnGrammarEditName index
-            , text = Grammar.variable grammar
-            , placeholder = "a"
-            , label = "Grammar number " ++ String.fromInt index
-            , minWidth = 30
-            , rightAlign = True
-            }
-        else
-          el [ mathFont, italic, Font.alignRight ] (text (Grammar.variable grammar))
-
-      viewMiddle grammar _ syntaxIndex _ =
-        el
-          (if Grammar.isEmpty grammar then [ Font.alignRight, Font.color gray ] else [Font.alignRight])
-          (text (if syntaxIndex == 0 then " ::=" else "|")) -- TODO
-
-      viewRightSide grammar index syntaxIndex syntax =
-        if Set.member 1 editing then
-          Ui.Input.text
-            [ mathFont
-            , italic
-            , htmlAttribute (Html.Attributes.id (grammarSyntaxId index syntaxIndex))
-            ]
-            { onChange = OnGrammarEditSyntax index syntaxIndex
-            , text = syntax
-            , placeholder = "a + b"
-            , label = "Syntax number " ++ String.fromInt syntaxIndex
-            , minWidth = 100
-            , rightAlign = False
-            }
-        else
-          el [ mathFont, italic ] (text syntax)
-  in
-  column
-    [ paddingXY 0 30, centerX, spacing 20 ]
-    (List.indexedMap viewOne (first :: rest))
 
 
 viewSemantics : OneOrMore Rule -> Set Int -> Element Msg
