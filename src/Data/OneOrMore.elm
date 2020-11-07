@@ -1,8 +1,13 @@
-module Data.OneOrMore exposing (OneOrMore(..), length, map, indexedMap, filter, filterMap, all, add, updateAt, getAt, isLast)
+module Data.OneOrMore exposing (OneOrMore(..), init, any, length, map, indexedMap, filter, filterMap, all, add, updateAt, getAt, isLast, trailing)
 
 
 type OneOrMore a
   = OneOrMore a (List a)
+
+
+init : a -> List a -> OneOrMore a
+init =
+  OneOrMore
 
 
 length : OneOrMore a -> Int
@@ -15,6 +20,13 @@ all (OneOrMore one rest) =
   one :: rest
 
 
+fromList : List a -> Maybe (OneOrMore a)
+fromList values =
+  case values of
+    one :: more -> Just (OneOrMore one more)
+    _ -> Nothing
+
+
 first : OneOrMore a -> a
 first (OneOrMore one _) =
   one
@@ -23,6 +35,11 @@ first (OneOrMore one _) =
 add : a -> OneOrMore a -> OneOrMore a
 add value (OneOrMore one rest) =
   OneOrMore one (rest ++ [value])
+
+
+any : (a -> Bool) -> OneOrMore a -> Bool
+any func values =
+  List.any func (all values)
 
 
 filter : (a -> Bool) -> OneOrMore a -> Maybe (OneOrMore a)
@@ -69,3 +86,17 @@ getAt searched values =
 isLast : Int -> OneOrMore a -> Bool
 isLast index values =
   index == length values - 1
+
+
+trailing : (a -> Bool) -> OneOrMore a -> OneOrMore a
+trailing func (OneOrMore one more) =
+  let loop vs =
+        case vs of
+          one_ :: more_ -> if func one_ then loop more_ else List.reverse vs
+          [] -> []
+  in
+  OneOrMore one (loop (List.reverse more))
+
+
+
+

@@ -12,11 +12,13 @@ import Html
 import Html.Attributes
 import Set exposing (Set)
 import Task
+import Data.Language as Language exposing (Language)
 import Data.Domain as Domain exposing (Domain(..))
 import Data.Grammar as Grammar exposing (Grammar(..))
 import Data.Rule as Rule exposing (Rule(..), Step(..))
 import Language.SimpleLambdaCalculus
 import Ui.Input
+import Ui.Domains
 
 
 main =
@@ -29,43 +31,31 @@ main =
 
 
 type alias Model =
-  { template : Maybe Language
-  , editing : Set Int
-  , domains : OneOrMore Domain
-  , grammars : OneOrMore Grammar
-  , semantics : OneOrMore Rule
+  { validated : Language
+  , domains : Maybe Ui.Domains.Model
+  , grammars : Maybe (OneOrMore Grammar)
+  , semantics : Maybe (OneOrMore Rule)
   , expression : String
-  , result : Result (List Error) (List State)
+  , result : Result (List String) ()
   }
 
 
-type alias Variable
-  = String
-
-
-type alias Language
-  = String
-
-
-type alias State
-  = String
-
-
-type alias Error
-  = String
-
+type Step
+  = DefineDomains
+  | DefineGrammar
+  | DefineSemantics
 
 
 
 -- INIT
 
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-  ( { template = Nothing
-    , editing = Set.empty
-    , domains = Language.SimpleLambdaCalculus.config.domains
-    , grammars = Language.SimpleLambdaCalculus.config.grammars
-    , semantics = Language.SimpleLambdaCalculus.config.semantics
+  ( { validated = Language.SimpleLambdaCalculus.config
+    , domains = Nothing
+    , grammars = Nothing
+    , semantics = Nothing
     , expression = Language.SimpleLambdaCalculus.config.expression
     , result = Err []
     }
@@ -80,8 +70,7 @@ init _ =
 type Msg
   = NoOp
   | OnToggleEdit Int
-  | OnDomainEditVars Int String
-  | OnDomainEditName Int String
+  | DomainMsg Ui.Domains.Msg
   | OnGrammarEditName Int String
   | OnGrammarEditSyntax Int Int String
   | OnRuleRight Int Int String
@@ -89,162 +78,169 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg ({validated} as model) =
   case msg of
     NoOp ->
       ( model, Cmd.none )
 
     OnToggleEdit step ->
-      ( if Set.member step model.editing
-            then
-              case OneOrMore.filter (not << Domain.isEmpty) model.domains of
-                Just domains ->
-                  case OneOrMore.filterMap Grammar.clean model.grammars of
-                    Just grammars ->
-                      case OneOrMore.filterMap Rule.clean model.semantics of
-                        Just semantics ->
-                          { model
-                          | editing = Set.remove step model.editing
-                          , domains = domains
-                          , grammars = grammars
-                          , semantics = semantics
-                          }
+      case step of
+        1 ->
+          case model.domains of
+            Nothing ->
+              ( { model | domains = Just (Ui.Domains.init validated.domains) }
+              , Cmd.none
+              )
 
-                        Nothing ->
-                          { model | result = Err [ "You must have at least one semantic rule." ] }
+            Just domains ->
+              case Ui.Domains.validate domains of
+                Ok valid ->
+                  ( { model
+                    | validated = { validated | domains = valid }
+                    , domains = Nothing
+                    , result = Ok ()
+                    }
+                  , Cmd.none
+                  )
 
-                    Nothing ->
-                      { model | result = Err [ "You must have at least one grammar." ] }
+                Err error ->
+                  ( { model | result = Err [error] }
+                  , Cmd.none
+                  )
 
-                Nothing ->
-                  { model | result = Err [ "You must have at least one set." ] }
-            else
-              { model
-              | editing = Set.insert step model.editing
-              , domains =
-                  if step == 1 then
-                    model.domains
-                      |> OneOrMore.add Domain.empty
-                  else
-                    model.domains
-              , grammars =
-                  if step == 1 then
-                    model.grammars
+        2 ->
+          case model.grammars of
+            Nothing ->
+              ( { model
+                | grammars =
+                    validated.grammars
                       |> OneOrMore.map Grammar.withEmpty
                       |> OneOrMore.add Grammar.empty
-                  else
-                    model.grammars
-              , semantics =
-                  if step == 2 then
-                    model.semantics
-                      |> OneOrMore.add Rule.empty
-                      |> OneOrMore.map Rule.withEmpty
-                  else
-                    model.semantics
-              }
+                      |> Just
+                }
+              , Cmd.none
+              )
 
-      , Cmd.none
-      )
+            Just grammars ->
+              case OneOrMore.filterMap Grammar.clean grammars of
+                Just valid ->
+                  ( { model | grammars = Just valid }
+                  , Cmd.none
+                  )
 
-    OnDomainEditVars index vars ->
-      let isLast =
-            OneOrMore.isLast index model.domains
+                Nothing ->
+                  ( { model | result = Err [ "You must have at least one grammar." ] }
+                  , Cmd.none
+                  )
 
-          update_ (Domain name _) =
-            Domain name (String.split ", " vars)
-      in
-      ( { model
-        | domains =
-            OneOrMore.updateAt index update_ model.domains
-              |> (if isLast then OneOrMore.add Domain.empty else identity)
-        }
-      , if isLast then
-          refocus -32 (domainVarsId index)
-        else
-          Cmd.none
-      )
+        _ -> -- TODO
+          (model, Cmd.none)
 
-    OnDomainEditName index name ->
-      let update_ (Domain _ vars) =
-            Domain name vars
-      in
-      ( { model | domains = OneOrMore.updateAt index update_ model.domains }
-      , Cmd.none
-      )
+    DomainMsg subMsg ->
+      case model.domains of
+        Just domains ->
+          Ui.Domains.update subMsg domains
+            |> Tuple.mapFirst (\subModel -> { model | domains = Just subModel })
+            |> Tuple.mapSecond (Cmd.map DomainMsg)
+
+        Nothing ->
+          ( model, Cmd.none )
 
     OnGrammarEditName index name ->
-      let update_ (Grammar _ syntaxes) =
-            Grammar name syntaxes
-      in
-      ( { model | grammars = OneOrMore.updateAt index update_ model.grammars }
-      , Cmd.none
-      )
+      case model.grammars of
+        Just grammars ->
+          let update_ (Grammar _ syntaxes) =
+                Grammar name syntaxes
+          in
+          ( { model | grammars = Just (OneOrMore.updateAt index update_ grammars) }
+          , Cmd.none
+          )
+
+        Nothing ->
+          ( model, Cmd.none )
 
     OnGrammarEditSyntax index syntaxIndex newSyntax ->
-      let isLast =
-            OneOrMore.isLast index model.grammars
+      case model.grammars of
+        Just grammars ->
+          let isLast =
+                OneOrMore.isLast index grammars
 
-          isLastSyntax =
-            OneOrMore.getAt index model.grammars
-              |> Maybe.map (Grammar.syntaxes >> OneOrMore.isLast syntaxIndex)
-              |> Maybe.withDefault False
+              isLastSyntax =
+                OneOrMore.getAt index grammars
+                  |> Maybe.map (Grammar.syntaxes >> OneOrMore.isLast syntaxIndex)
+                  |> Maybe.withDefault False
 
-          update_ (Grammar name syntaxes) =
-            OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes
-              |> (if isLastSyntax then OneOrMore.add "" else identity)
-              |> Grammar name
-      in
-      ( { model
-        | grammars =
-            OneOrMore.updateAt index update_ model.grammars
-              |> (if isLast then OneOrMore.add Grammar.empty else identity)
-        }
-      , if isLastSyntax then
-          refocus -32 (grammarSyntaxId index syntaxIndex)
-        else
-          Cmd.none
-      )
+              update_ (Grammar name syntaxes) =
+                OneOrMore.updateAt syntaxIndex (always newSyntax) syntaxes
+                  |> (if isLastSyntax then OneOrMore.add "" else identity)
+                  |> Grammar name
+          in
+          ( { model
+            | grammars =
+                OneOrMore.updateAt index update_ grammars
+                  |> (if isLast then OneOrMore.add Grammar.empty else identity)
+                  |> Just
+            }
+          , if isLastSyntax then
+              refocus -32 (grammarSyntaxId index syntaxIndex)
+            else
+              Cmd.none
+          )
+
+        Nothing ->
+          ( model, Cmd.none )
 
     OnRuleLeft index ruleIndex new ->
-      let isLast =
-            OneOrMore.isLast index model.semantics
+      case model.semantics of
+        Just semantics ->
+          let isLast =
+                OneOrMore.isLast index semantics
 
-          isLastCondition =
-            OneOrMore.getAt index model.semantics
-              |> Maybe.map ((==) (ruleIndex + 1) << List.length << Rule.conditions)
-              |> Maybe.withDefault False
+              isLastCondition =
+                OneOrMore.getAt index semantics
+                  |> Maybe.map ((==) (ruleIndex + 1) << List.length << Rule.conditions)
+                  |> Maybe.withDefault False
 
-          update_ (Rule precs conclusion) =
-            if ruleIndex == -1 then
-              Rule precs (updateStep conclusion)
-            else
-              Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
-                |> (if isLastCondition then Rule.withEmpty else identity)
+              update_ (Rule precs conclusion) =
+                if ruleIndex == -1 then
+                  Rule precs (updateStep conclusion)
+                else
+                  Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
+                    |> (if isLastCondition then Rule.withEmpty else identity)
 
-          updateStep (Step a b) =
-            Step new b
-      in
-      ( { model
-        | semantics =
-            OneOrMore.updateAt index update_ model.semantics
-              |> (if isLast then OneOrMore.add (Rule.withEmpty Rule.empty) else identity)
-        }
-      , Cmd.none
-      )
+              updateStep (Step a b) =
+                Step new b
+          in
+          ( { model
+            | semantics =
+                OneOrMore.updateAt index update_ semantics
+                  |> (if isLast then OneOrMore.add (Rule.withEmpty Rule.empty) else identity)
+                  |> Just
+            }
+          , Cmd.none
+          )
+
+        Nothing ->
+          ( model, Cmd.none )
 
     OnRuleRight index ruleIndex new ->
-      let update_ (Rule precs conclusion) =
-            if ruleIndex == -1 then
-              Rule precs (updateStep conclusion)
-            else
-              Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
+      case model.semantics of
+        Just semantics ->
+          let update_ (Rule precs conclusion) =
+                if ruleIndex == -1 then
+                  Rule precs (updateStep conclusion)
+                else
+                  Rule (List.Extra.updateAt ruleIndex updateStep precs) conclusion
 
-          updateStep (Step a b) =
-            Step a new
-      in
-      ( { model | semantics = OneOrMore.updateAt index update_ model.semantics }
-      , Cmd.none
-      )
+              updateStep (Step a b) =
+                Step a new
+          in
+          ( { model | semantics = Just (OneOrMore.updateAt index update_ semantics) }
+          , Cmd.none
+          )
+
+        Nothing ->
+          ( model, Cmd.none )
 
 
 
@@ -286,81 +282,27 @@ view model =
                     (List.map text errors)
 
                 Ok _ -> none
-            , stepTitle 1 "Define the grammar" model.editing
+            , stepTitle 1 "Define the domains" model.domains
             , paragraph []
                 [ text
                   """Here we specify our domains and our grammar. There are a few special domains.
                   """
                 ]
-            , viewDomains model.domains model.editing
-            , viewGrammar model.grammars model.editing
-            , stepTitle 2 "Define the semantics" model.editing
-            , viewSemantics model.semantics model.editing
+            , case model.domains of
+                Just domains ->
+                  map DomainMsg (Ui.Domains.view domains)
+
+                Nothing ->
+                  Ui.Domains.viewStatic model.validated.domains
+            --, stepTitle 1 "Define the grammar" model.editing
+            --, viewGrammar model.grammars model.editing
+            --, stepTitle 2 "Define the semantics" model.editing
+            --, viewSemantics model.semantics model.editing
             , el [ paddingXY 0 30, El.alignLeft, size 25 ] (text "3. Evaluate an expression")
             , viewEvaluator model
             ]
       ]
   }
-
-
-viewDomains : OneOrMore Domain -> Set Int -> Element Msg
-viewDomains (OneOrMore first rest) editing =
-  let viewLeftSide index (Domain name vars) =
-        if Set.member 1 editing then
-            Ui.Input.text
-              [ mathFont
-              , italic
-              , htmlAttribute (Html.Attributes.id (domainVarsId index))
-              ]
-              { onChange = OnDomainEditVars index
-              , text = String.join ", " vars
-              , placeholder = "a, b, c"
-              , label = "Variables of domain number " ++ String.fromInt index
-              , minWidth = 70
-              , rightAlign = True
-              }
-        else
-          el [ mathFont, italic, Font.alignRight ] (text (String.join ", " vars))
-
-      viewMiddle _ (Domain name vars) =
-        if String.isEmpty name && List.isEmpty vars then
-            el [ mathFont, Font.color gray ] (text " ∈ ")
-        else
-            el [ mathFont ] (text " ∈ ")
-
-      viewRightSide index (Domain name vars) =
-        if Set.member 1 editing then
-          Ui.Input.text
-            []
-            { onChange = OnDomainEditName index
-            , text = name
-            , placeholder = "Another"
-            , label = "Name of domain number " ++ String.fromInt index
-            , minWidth = 100
-            , rightAlign = False
-            }
-        else
-          el [ boldFont, bold ] (text name)
-  in
-  el [ centerX, paddingXY 0 20 ] <|
-    indexedTable
-      [ centerX, spacing 5 ]
-      { data = first :: rest
-      , columns =
-          [ { header = none
-            , width = shrink
-            , view = viewLeftSide
-            }
-          , { header = none
-            , width = shrink
-            , view = viewMiddle
-            }
-          , { header = none
-            , width = shrink
-            , view = viewRightSide
-            }
-          ]
-      }
 
 
 viewGrammar : OneOrMore Grammar -> Set Int -> Element Msg
@@ -507,8 +449,8 @@ title string =
   el [ paddingXY 0 40, centerX, size 35 ] (text string)
 
 
-stepTitle : Int -> String -> Set Int -> Element Msg
-stepTitle number string editing =
+stepTitle : Int -> String -> Maybe a -> Element Msg
+stepTitle number string state =
   row
     [ width fill ]
     [ el [ paddingXY 0 30, El.alignLeft, size 25 ] (text <| String.fromInt number ++ ". " ++ string)
@@ -516,7 +458,10 @@ stepTitle number string editing =
         Input.button
           []
           { onPress = Just (OnToggleEdit number)
-          , label = text (if Set.member number editing then "Save" else "Edit")
+          , label = text <|
+              case state of
+                Just _ -> "Save"
+                Nothing -> "Edit"
           }
     ]
 
