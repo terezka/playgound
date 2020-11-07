@@ -8,6 +8,7 @@ import Element as El exposing (..)
 import Element.Font as Font
 import Data.OneOrMore as OneOrMore exposing (OneOrMore)
 import Data.Grammar as Grammar exposing (Grammar)
+import Data.Domain as Domain exposing (Domain)
 import List.Extra
 import String.Extra
 import Set exposing (Set)
@@ -47,6 +48,12 @@ isUnfinished inputs =
   String.Extra.isBlank inputs.variable || (OneOrMore.any String.Extra.isBlank inputs.syntaxes)
 
 
+removePlaceholder : Inputs -> Maybe Inputs
+removePlaceholder inputs =
+  OneOrMore.filter (not << String.Extra.isBlank) inputs.syntaxes
+    |> Maybe.map (\syntaxes -> { inputs | syntaxes = syntaxes})
+
+
 
 -- INIT
 
@@ -55,7 +62,9 @@ init : OneOrMore Grammar -> Model
 init grammars =
   let toInputs grammar =
         { variable = Grammar.variable grammar
-        , syntaxes = Grammar.syntaxes grammar
+        , syntaxes =
+            Grammar.syntaxes grammar
+              |> OneOrMore.add ""
         }
   in
   OneOrMore.map toInputs grammars
@@ -66,12 +75,66 @@ init grammars =
 -- VALIDATE
 
 
-validate : Model -> Result String (OneOrMore Grammar)
-validate values =
+validate : OneOrMore Domain -> Model -> Result String (OneOrMore Grammar)
+validate domains values =
   let toGrammar inputs =
         Grammar.init inputs.variable inputs.syntaxes
   in
-  Ok (OneOrMore.map toGrammar values)
+  Ok values
+    |> Result.andThen isOneFilledOut
+    |> Result.andThen isFilledOutCorrectly
+    |> Result.andThen hasOnlyUniqueMainVariables
+    |> Result.andThen (mainVariableMustBelongToDomain domains)
+    --|> Result.andThen onlyOneGrammarPerDomain
+    |> Result.map (OneOrMore.map toGrammar)
+
+
+isOneFilledOut : Model -> Result String Model
+isOneFilledOut values =
+  OneOrMore.filterMap removePlaceholder values
+    |> Maybe.andThen (OneOrMore.filter (not << isEmpty))
+    |> Maybe.map Ok
+    |> Maybe.withDefault (Err "You must have at least one grammar!")
+
+
+isFilledOutCorrectly : Model -> Result String Model
+isFilledOutCorrectly values =
+  if OneOrMore.any isUnfinished values then
+    Err "Grammars must have a variable and set of syntax definitions. If you'd like to discard an entry, delete all fields."
+  else
+    Ok values
+
+
+hasOnlyUniqueMainVariables : Model -> Result String Model
+hasOnlyUniqueMainVariables values =
+  let variables =
+        OneOrMore.values values
+          |> List.map .variable
+  in
+  if Ui.Utils.onlyUnique variables then
+    Ok values
+  else
+    Err "All grammar left sides must be unique."
+
+
+mainVariableMustBelongToDomain : OneOrMore Domain -> Model -> Result String Model
+mainVariableMustBelongToDomain domains values =
+  let variables =
+        OneOrMore.values values
+          |> List.map .variable
+
+      allDomainVariables =
+        OneOrMore.map Domain.variables domains
+          |> OneOrMore.values
+          |> List.foldl Set.union Set.empty
+
+      belongs variable =
+        Set.member variable allDomainVariables
+  in
+  if List.all belongs variables then
+    Ok values
+  else
+    Err "All grammar left sides must belong to a domain."
 
 
 
@@ -207,10 +270,13 @@ viewVariable index inputs syntaxIndex _ =
 
 
 viewEqualSign : Int -> Inputs -> Int -> String -> Element Msg
-viewEqualSign _ inputs syntaxIndex _ =
+viewEqualSign _ inputs syntaxIndex syntax =
   el
     [ Font.alignRight
-    , Font.color (if isEmpty inputs then Ui.Utils.gray else Ui.Utils.black)
+    , Font.color <|
+        if isEmpty inputs then Ui.Utils.gray
+        else if String.Extra.isBlank syntax then Ui.Utils.gray
+        else Ui.Utils.black
     ]
     (text (if syntaxIndex == 0 then " ::=" else "|"))
 

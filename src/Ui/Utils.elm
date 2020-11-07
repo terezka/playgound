@@ -6,6 +6,7 @@ import Element.Border as Border
 import Element.Font as Font exposing (..)
 import Html.Attributes
 import Task
+import Set exposing (Set)
 
 
 id : String -> Attribute msg
@@ -65,3 +66,13 @@ refocus msg px id_ =
     |> Task.andThen (\_ -> Dom.getViewport)
     |> Task.andThen (\{viewport} -> Dom.setViewport viewport.x (viewport.y + px))
     |> Task.attempt (\_ -> msg)
+
+
+
+-- HELP
+
+
+{-| Move to seperate module. -}
+onlyUnique : List comparable -> Bool
+onlyUnique values =
+  Set.size (Set.fromList values) == List.length values

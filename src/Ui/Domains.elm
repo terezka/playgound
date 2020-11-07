@@ -111,7 +111,7 @@ hasUniqueNames values =
         OneOrMore.values values
           |> List.map .name
   in
-  if onlyUnique names then
+  if Ui.Utils.onlyUnique names then
     Ok values
   else
     Err "Your domains must all have unique names!"
@@ -132,17 +132,12 @@ hasUniqueVariables values =
       allUnique =
         OneOrMore.values processedValues
           |> List.concatMap Tuple.second
-          |> onlyUnique
+          |> Ui.Utils.onlyUnique
   in
   if allUnique then
     Ok processedValues
   else
     Err "Your domains must all have unique variables!"
-
-
-onlyUnique : List comparable -> Bool
-onlyUnique values =
-  Set.size (Set.fromList values) == List.length values
 
 
 
