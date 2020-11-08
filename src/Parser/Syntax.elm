@@ -1,17 +1,18 @@
-module Parser.Grammar exposing (Grammar(..), fromString)
+module Parser.Syntax exposing (Syntax(..), fromString)
 
 import Parser exposing (..)
 import Data.Language as Language exposing (Language)
 import Data.Domain as Domain exposing (Domain(..))
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
+import Set exposing (Set)
 
-
-type Grammar
+type Syntax
   = Symbol String
   | Variable String
+  | Spaces
 
 
-fromString : Language -> String -> Result String (List Grammar)
+fromString : Language -> String -> Result String (List Syntax)
 fromString language =
   run (parser language)
     >> Result.mapError deadEndsToString
@@ -20,15 +21,15 @@ fromString language =
 -- PARSER
 
 
-parser : Language -> Parser (List Grammar)
+parser : Language -> Parser (List Syntax)
 parser language =
   succeed finalize
     |. spaces
-    |= loop [] (pGrammar language)
+    |= loop [] (pSyntax language)
     |. end
 
 
-finalize : List Grammar -> List Grammar
+finalize : List Syntax -> List Syntax
 finalize syntaxes =
   let fold syntax last =
         case (last, syntax) of
@@ -39,21 +40,21 @@ finalize syntaxes =
     |> List.reverse
 
 
-pGrammar : Language -> List Grammar -> Parser (Step (List Grammar) (List Grammar))
-pGrammar language done =
+pSyntax : Language -> List Syntax -> Parser (Step (List Syntax) (List Syntax))
+pSyntax language done =
   oneOf
     [ succeed (\syntax -> Loop (syntax :: done))
         |= pVariables language
     , succeed (\syntax -> Loop (Symbol syntax :: done))
         |= pOneChar
-    , succeed (Loop done)
-        |. pSpaces
+    , succeed (\_ -> Loop (Spaces :: done))
+        |= pSpaces
     , succeed ()
         |> map (\_ -> Done (List.reverse done))
     ]
 
 
-pVariables : Language -> Parser Grammar
+pVariables : Language -> Parser Syntax
 pVariables language =
   let pVariable (_, variable) =
         succeed (Variable variable)
@@ -88,8 +89,14 @@ isWhitespace c =
 
 toVariables : Language -> List (String, String)
 toVariables language =
-  OneOrMore.all language.domains
-    |> List.concatMap (\d -> List.map (\v -> (Domain.name d, v)) (Domain.variables d))
-    |> List.sortBy (\(d, v) -> String.length v)
+  let toTuple domain variable = (Domain.name domain, variable)
+      toTuples domain =
+        Domain.variables domain
+          |> Set.toList
+          |> List.map (toTuple domain)
+  in
+  OneOrMore.values language.domains
+    |> List.sortBy (Set.size << Domain.variables)
+    |> List.concatMap toTuples
     |> List.reverse
 
