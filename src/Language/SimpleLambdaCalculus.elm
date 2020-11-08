@@ -19,7 +19,7 @@ config =
             variable = Syntax [Variable "x"]
             parentes = Syntax [Symbol "(", Variable "e", Symbol ")"]
         in
-        OneOrMore (Grammar.init "e" (OneOrMore.init lambda [application, variable, parentes]))
+        OneOrMore (Grammar.init "e" (OneOrMore.init lambda [parentes, application, variable]))
           []
     , semantics =
         OneOrMore (Rule [Step "e₁" "e₁′"] (Step "e₁ e₂" "e₁ e₂"))
