@@ -94,6 +94,7 @@ update msg ({validated} as model) =
 
             Just domains ->
               case Ui.Domains.validate domains of
+                -- TODO validate grammar and semantics on domain edit
                 Ok valid ->
                   ( { model
                     | validated = { validated | domains = valid }
@@ -116,6 +117,7 @@ update msg ({validated} as model) =
               )
 
             Just grammars ->
+                -- TODO validate semantics on grammar edit
               case Ui.Grammars.validate model.validated.domains grammars of
                 Ok valid ->
                   ( { model
