@@ -119,7 +119,8 @@ update msg ({validated} as model) =
               case Ui.Grammars.validate model.validated.domains grammars of
                 Ok valid ->
                   ( { model
-                    | grammars = Nothing
+                    | validated = { validated | grammars = valid }
+                    , grammars = Nothing
                     , result = Ok ()
                     }
                   , Cmd.none

@@ -64,6 +64,7 @@ init grammars =
         { variable = Grammar.variable grammar
         , syntaxes =
             Grammar.syntaxes grammar
+              |> OneOrMore.map Grammar.syntaxToString
               |> OneOrMore.add ""
         }
   in
@@ -77,8 +78,12 @@ init grammars =
 
 validate : OneOrMore Domain -> Model -> Result String (OneOrMore Grammar)
 validate domains values =
-  let toGrammar inputs =
-        Grammar.init inputs.variable inputs.syntaxes
+  let toGrammars validated =
+        OneOrMore.combine (OneOrMore.map toGrammar validated)
+
+      toGrammar inputs =
+        OneOrMore.combine (OneOrMore.map (Grammar.syntaxFromString domains) inputs.syntaxes)
+          |> Result.map (Grammar.init inputs.variable)
   in
   Ok values
     |> Result.andThen isOneFilledOut
@@ -86,7 +91,7 @@ validate domains values =
     |> Result.andThen hasOnlyUniqueMainVariables
     |> Result.andThen (mainVariableMustBelongToDomain domains)
     |> Result.andThen (onlyOneGrammarPerDomain domains)
-    |> Result.map (OneOrMore.map toGrammar)
+    |> Result.andThen toGrammars
 
 
 isOneFilledOut : Model -> Result String Model
@@ -145,7 +150,7 @@ onlyOneGrammarPerDomain domains values =
           |> Set.fromList
 
       onlyOneBelongs domainVariables =
-        Set.size (Set.intersect variables domainVariables) == 1
+        Set.size (Set.intersect variables domainVariables) < 2
   in
   if OneOrMore.all (onlyOneBelongs << Domain.variables) domains then
     Ok values
@@ -229,7 +234,7 @@ viewStatic grammars =
                 }
               , { header = none
                 , width = shrink
-                , view = \_ syntax -> el [ Ui.Utils.mathFont, Font.italic ] (text syntax)
+                , view = \_ syntax -> el [ Ui.Utils.mathFont, Font.italic ] (text (Grammar.syntaxToString syntax))
                 }
               ]
           }

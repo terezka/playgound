@@ -3,7 +3,7 @@ module Language.SimpleLambdaCalculus exposing (config)
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
 import Data.Language as Language
 import Data.Domain as Domain
-import Data.Grammar as Grammar
+import Data.Grammar as Grammar exposing (Syntax(..), Piece(..))
 import Data.Rule as Rule exposing (Rule(..), Step(..))
 
 
@@ -14,7 +14,12 @@ config =
           [ Domain.init "Variables" ["x", "y", "z", "w"]
           ]
     , grammars =
-        OneOrMore (Grammar.init "e" (OneOrMore.init "λx. e" [ "e₁ e₂", "x", "(e)"]))
+        let lambda = Syntax [Symbol "λ", Variable "x", Symbol ".", Spaces, Variable "e"]
+            application = Syntax [Variable "e₁", Spaces, Variable "e₂"]
+            variable = Syntax [Variable "x"]
+            parentes = Syntax [Symbol "(", Spaces, Variable "e", Spaces, Symbol ")"]
+        in
+        OneOrMore (Grammar.init "e" (OneOrMore.init lambda [application, variable, parentes]))
           []
     , semantics =
         OneOrMore (Rule [Step "e₁" "e₁′"] (Step "e₁ e₂" "e₁ e₂"))

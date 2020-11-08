@@ -1,4 +1,4 @@
-module Data.OneOrMore exposing (OneOrMore(..), init, any, all, length, map, indexedMap, filter, filterMap, values, add, updateAt, getAt, isLast, trailing)
+module Data.OneOrMore exposing (..)
 
 
 type OneOrMore a
@@ -45,6 +45,19 @@ any func values_ =
 all : (a -> Bool) -> OneOrMore a -> Bool
 all func values_ =
   List.all func (values values_)
+
+
+combine : OneOrMore (Result x a) -> Result x (OneOrMore a)
+combine (OneOrMore one more) =
+  let next some acc =
+        case some of
+          Ok a :: rest -> next rest (add a acc)
+          Err x :: rest -> Err x
+          [] -> Ok acc
+  in
+  case one of
+    Ok a -> next more (OneOrMore a [])
+    Err x -> Err x
 
 
 filter : (a -> Bool) -> OneOrMore a -> Maybe (OneOrMore a)
