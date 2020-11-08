@@ -85,7 +85,7 @@ validate domains values =
     |> Result.andThen isFilledOutCorrectly
     |> Result.andThen hasOnlyUniqueMainVariables
     |> Result.andThen (mainVariableMustBelongToDomain domains)
-    --|> Result.andThen onlyOneGrammarPerDomain
+    |> Result.andThen (onlyOneGrammarPerDomain domains)
     |> Result.map (OneOrMore.map toGrammar)
 
 
@@ -136,6 +136,21 @@ mainVariableMustBelongToDomain domains values =
   else
     Err "All grammar left sides must belong to a domain."
 
+
+onlyOneGrammarPerDomain : OneOrMore Domain -> Model -> Result String Model
+onlyOneGrammarPerDomain domains values =
+  let variables =
+        OneOrMore.values values
+          |> List.map .variable
+          |> Set.fromList
+
+      onlyOneBelongs domainVariables =
+        Set.size (Set.intersect variables domainVariables) == 1
+  in
+  if OneOrMore.all (onlyOneBelongs << Domain.variables) domains then
+    Ok values
+  else
+    Err "You must have only one grammar per domain."
 
 
 -- UPDATE
