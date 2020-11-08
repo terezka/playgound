@@ -17,7 +17,7 @@ config =
         let lambda = Syntax [Symbol "λ", Variable "x", Symbol ".", Spaces, Variable "e"]
             application = Syntax [Variable "e₁", Spaces, Variable "e₂"]
             variable = Syntax [Variable "x"]
-            parentes = Syntax [Symbol "(", Spaces, Variable "e", Spaces, Symbol ")"]
+            parentes = Syntax [Symbol "(", Variable "e", Symbol ")"]
         in
         OneOrMore (Grammar.init "e" (OneOrMore.init lambda [application, variable, parentes]))
           []

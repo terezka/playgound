@@ -31,6 +31,11 @@ gray =
   rgb255 175 175 175
 
 
+darkGray : Color
+darkGray =
+  rgb255 100 100 100
+
+
 black : Color
 black =
   rgb255 0 0 0

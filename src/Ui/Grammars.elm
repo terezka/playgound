@@ -230,11 +230,19 @@ viewStatic grammars =
                 }
               , { header = none
                 , width = shrink
-                , view = \index _ -> el [Font.alignRight] (text <| if index == 0 then " ::=" else "|")
+                , view = \index _ -> el [ Font.alignRight ] (text <| if index == 0 then " ::=" else "|")
                 }
               , { header = none
                 , width = shrink
-                , view = \_ syntax -> el [ Ui.Utils.mathFont, Font.italic ] (text (Grammar.syntaxToString syntax))
+                , view = \_ (Grammar.Syntax pieces) ->
+                    let viewPiece piece =
+                          case piece of
+                            Grammar.Symbol symbol -> el [] (text symbol)
+                            Grammar.Variable var -> el [ Font.color Ui.Utils.darkGray ] (text var)
+                            Grammar.Spaces -> el [] (text " ")
+
+                    in
+                    row [Ui.Utils.mathFont, Font.italic] (List.map viewPiece pieces)
                 }
               ]
           }
