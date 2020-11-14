@@ -19,37 +19,45 @@ fromString string =
 pExpression : Parser () -> (Exp -> Exp) -> Parser Exp
 pExpression ending finish =
   oneOf
-    [ succeed (Exp [])
-        |. symbol "("
-        |> andThen (\e1 ->
-              pExpression (symbol ")") (addExp e1)
-            )
-    , succeed (Exp [])
-        |. symbol "λ"
-        |> andThen (\e1 ->
-              pExpression (symbol "." |. spaces) (addExp e1)
-                |> andThen (\e2 ->
-                    pExpression (succeed ()) (addExp e2)
-                  )
-            )
+    [ pSyntax (Exp []) [Symbol "(", Variable "e", Symbol ")"]
+    , pSyntax (Exp []) [Symbol "λ", Variable "x", Symbol ". ", Variable "e"]
     , succeed Var
         |= variable { start = Char.isLower, inner = Char.isLower, reserved = Set.empty }
     ]
     |> andThen (\exp ->
-          succeed identity
-            |. spaces
-            |= oneOf
-                [ succeed (\b -> Exp [exp, b])
-                    |. symbol "||"
-                    |. spaces
-                    |> andThen (pExpression ending)
-                , succeed (\b -> Exp [exp, b])
-                    |> andThen (pExpression ending)
-                , succeed exp
-                    |. ending
-                ]
+          oneOf
+            [ pSyntax (Exp [exp]) [Symbol " ", Variable "e"]
+            , succeed exp
+                |. ending
+            ]
        )
     |> map finish
+
+
+type Syntax
+  = Symbol String
+  | Variable String
+
+
+pSyntax : Exp -> List Syntax -> Parser Exp
+pSyntax init syntax =
+  let next some acc =
+        case some of
+          Symbol sym :: rest ->
+            next rest (acc |. symbol sym)
+
+          Variable var :: Symbol sym :: rest ->
+            let subExp exp = pExpression (symbol sym) (addExp exp) in
+            next rest (acc |> andThen subExp)
+
+          Variable var :: rest ->
+            let subExp exp = pExpression (succeed ()) (addExp exp) in
+            next rest (acc |> andThen subExp)
+
+          [] ->
+            acc
+  in
+  next syntax (succeed init)
 
 
 addExp : Exp -> Exp -> Exp
