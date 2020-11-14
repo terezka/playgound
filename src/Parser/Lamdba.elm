@@ -15,7 +15,6 @@ fromString string =
     |> Result.mapError (Debug.log "error")
     |> Result.mapError deadEndsToString
 
--- λa. a λb. b
 
 pExpression : Parser () -> (Exp -> Exp) -> Parser Exp
 pExpression ending finish =
@@ -23,12 +22,16 @@ pExpression ending finish =
     [ succeed identity
         |. symbol "("
         |> andThen (pExpression (symbol ")"))
-    , succeed (\a b -> Exp [Var a, b])
+    , succeed (Exp [])
         |. symbol "λ"
-        |= variable { start = Char.isLower, inner = Char.isLower, reserved = Set.empty }
-        |. symbol "."
-        |. spaces
-        |> andThen (pExpression (succeed ()))
+        |> andThen (\e1 ->
+              pExpression (symbol ".") (addExp e1)
+                |> andThen (\e2 ->
+                    succeed (addExp e2)
+                      |. spaces
+                      |> andThen (pExpression (succeed ()))
+                  )
+            )
     , succeed Var
         |= variable { start = Char.isLower, inner = Char.isLower, reserved = Set.empty }
     ]
@@ -47,5 +50,12 @@ pExpression ending finish =
                 ]
        )
     |> map finish
+
+
+addExp : Exp -> Exp -> Exp
+addExp exp1 exp =
+  case exp1 of
+    Exp list -> Exp (list ++ [exp])
+    var -> var
 
 
