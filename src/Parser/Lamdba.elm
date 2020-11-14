@@ -5,9 +5,8 @@ import Set
 
 
 type Exp
-  = Lambda String Exp
-  | Variable String
-  | Application Exp Exp
+  = Exp (List Exp)
+  | Var String
 
 
 fromString : String -> Result String Exp
@@ -24,24 +23,24 @@ pExpression ending finish =
     [ succeed identity
         |. symbol "("
         |> andThen (pExpression (symbol ")"))
-    , succeed Lambda
+    , succeed (\a b -> Exp [Var a, b])
         |. symbol "λ"
         |= variable { start = Char.isLower, inner = Char.isLower, reserved = Set.empty }
         |. symbol "."
         |. spaces
         |> andThen (pExpression (succeed ()))
-    , succeed Variable
+    , succeed Var
         |= variable { start = Char.isLower, inner = Char.isLower, reserved = Set.empty }
     ]
     |> andThen (\exp ->
           succeed identity
             |. spaces
             |= oneOf
-                [ succeed (Application exp)
+                [ succeed (\b -> Exp [exp, b])
                     |. symbol "||"
                     |. spaces
                     |> andThen (pExpression ending)
-                , succeed (Application exp)
+                , succeed (\b -> Exp [exp, b])
                     |> andThen (pExpression ending)
                 , succeed exp
                     |. ending
@@ -50,7 +49,3 @@ pExpression ending finish =
     |> map finish
 
 
-
-isWhitespace : Char -> Bool
-isWhitespace c =
-  c == ' ' || c == '\t' || c == '\n' || c == '\r'
