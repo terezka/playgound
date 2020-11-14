@@ -19,17 +19,17 @@ fromString string =
 pExpression : Parser () -> (Exp -> Exp) -> Parser Exp
 pExpression ending finish =
   oneOf
-    [ succeed identity
+    [ succeed (Exp [])
         |. symbol "("
-        |> andThen (pExpression (symbol ")"))
+        |> andThen (\e1 ->
+              pExpression (symbol ")") (addExp e1)
+            )
     , succeed (Exp [])
         |. symbol "λ"
         |> andThen (\e1 ->
-              pExpression (symbol ".") (addExp e1)
+              pExpression (symbol "." |. spaces) (addExp e1)
                 |> andThen (\e2 ->
-                    succeed (addExp e2)
-                      |. spaces
-                      |> andThen (pExpression (succeed ()))
+                    pExpression (succeed ()) (addExp e2)
                   )
             )
     , succeed Var
