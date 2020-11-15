@@ -1,6 +1,8 @@
-module Data.Domain exposing (Domain(..), name, variables, init)
+module Data.Domain exposing (Domain(..), name, variables, init, find, belongs)
 
 import Set exposing (Set)
+import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
+import List.Extra
 
 
 type Domain
@@ -21,3 +23,12 @@ variables : Domain -> Set String
 variables (Domain _ vars) =
   vars
 
+
+find : String -> OneOrMore Domain -> Maybe Domain
+find var domains =
+  List.Extra.find (belongs var) (OneOrMore.values domains)
+
+
+belongs : String -> Domain -> Bool
+belongs var (Domain _ vars) =
+  Set.member var vars

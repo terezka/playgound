@@ -1,8 +1,14 @@
-module Data.Grammar exposing (Grammar, Syntax(..), Piece(..), variable, syntaxes, init, syntaxToString, syntaxFromString)
+module Data.Grammar exposing
+  ( Grammar, Syntax(..), Piece(..)
+  , variable, syntaxes, find, init
+  , syntaxToString, syntaxFromString
+  , Branch(..), toBranches
+  )
 
 import Parser exposing (..)
 import Data.Domain as Domain exposing (Domain(..))
 import Data.OneOrMore as OneOrMore exposing (OneOrMore(..))
+import List.Extra
 import Set exposing (Set)
 
 
@@ -33,6 +39,13 @@ syntaxes (Grammar _ syntaxes_) =
 variable : Grammar -> String
 variable (Grammar name _) =
   name
+
+
+find : Domain -> OneOrMore Grammar -> Maybe Grammar
+find domain grammars =
+  List.Extra.find
+    (\(Grammar name _) -> Set.member name (Domain.variables domain))
+    (OneOrMore.values grammars)
 
 
 syntaxToString : Syntax -> String
@@ -136,4 +149,68 @@ toVariables domains =
     |> List.sortBy (Set.size << Domain.variables)
     |> List.concatMap toTuples
     |> List.reverse
+
+
+
+-- BRANCHING
+
+
+type Branch
+  = Branch Bool Piece (List Branch)
+
+
+toBranches : Domain -> Grammar -> ( List Branch, List Branch )
+toBranches domain grammar =
+  let addSyntaxes : List Syntax -> ( List Branch, List Branch ) -> ( List Branch, List Branch )
+      addSyntaxes syntaxes_ ( mains, inner ) =
+        case syntaxes_ of
+          Syntax (Variable var :: pieces) :: rest ->
+            if Domain.belongs var domain
+              then addSyntaxes rest ( mains, addPieces pieces inner )
+              else addSyntaxes rest ( addPiece (Variable var) pieces mains, inner )
+
+          Syntax (head :: pieces) :: rest ->
+            addSyntaxes rest ( addPiece head pieces mains, inner )
+
+          _ ->
+            ( mains, inner )
+
+      addPieces : List Piece -> List Branch -> List Branch
+      addPieces pieces inners =
+        case pieces of
+          piece :: rest -> addPiece piece rest inners
+          [] -> inners
+
+      addPiece : Piece -> List Piece -> List Branch -> List Branch
+      addPiece piece rest branches =
+        case tryAll (tryOne piece rest) [] branches of
+          Just updated -> updated
+          Nothing -> toNew piece rest :: branches
+
+      tryAll : (Branch -> Maybe Branch) -> List Branch -> List Branch -> Maybe (List Branch)
+      tryAll update tried untried =
+        case untried of
+          branch :: more ->
+            case update branch of
+              Just updated -> Just (tried ++ updated :: more)
+              Nothing -> tryAll update (tried ++ [branch]) more
+
+          [] ->
+            Nothing
+
+      tryOne : Piece -> List Piece -> Branch -> Maybe Branch
+      tryOne p1 rest (Branch ends p2 branches) =
+        if p1 == p2
+          then Just (Branch ends p2 (addPieces rest branches))
+          else Nothing
+
+      toNew : Piece -> List Piece -> Branch
+      toNew piece rest =
+        case rest of
+          one :: more -> Branch False piece [toNew one more]
+          [] -> Branch True piece []
+  in
+  addSyntaxes (OneOrMore.values <| syntaxes grammar) ([], [])
+
+
 
